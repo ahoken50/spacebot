@@ -1,0 +1,10 @@
+# Secrets et données d’exécution locale
+.env
+instance/
+volumes/
+
+# Journaux et fichiers transitoires
+*.log
+*.tmp
+
+# Le gabarit de configuration et les profils sont versionnés; les documents municipaux ne le sont pas.

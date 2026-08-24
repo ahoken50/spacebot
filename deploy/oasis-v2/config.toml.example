@@ -1,0 +1,201 @@
+# Instance locale Docker dédiée au pilotage de la convention COV_OASIS-V2.
+# La clé OpenRouter est fournie au conteneur avec OPENROUTER_API_KEY dans .env.
+# Aucun modèle Claude n’est configuré.
+
+[llm]
+openrouter_key = "env:OPENROUTER_API_KEY"
+
+[defaults]
+max_concurrent_branches = 2
+max_turns = 4
+context_window = 128000
+history_backfill_count = 40
+worker_log_mode = "errors_only"
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[defaults.routing]
+channel = "openrouter/deepseek/deepseek-v4-flash"
+branch = "openrouter/openai/gpt-oss-120b"
+worker = "openrouter/qwen/qwen3.7-flash"
+compactor = "openrouter/mistralai/mistral-nemo"
+cortex = "openrouter/mistralai/mistral-nemo"
+rate_limit_cooldown_secs = 90
+
+[defaults.routing.task_overrides]
+document_vision = "openrouter/google/gemini-2.5-flash-lite"
+deep_reasoning = "openrouter/openai/gpt-oss-120b"
+structured_extraction = "openrouter/qwen/qwen3.7-flash"
+data_processing = "openrouter/qwen/qwen3.7-flash"
+
+[defaults.routing.fallbacks]
+"openrouter/deepseek/deepseek-v4-flash" = ["openrouter/openai/gpt-oss-120b", "openrouter/google/gemini-2.5-flash-lite"]
+"openrouter/openai/gpt-oss-120b" = ["openrouter/deepseek/deepseek-v4-flash", "openrouter/google/gemini-2.5-flash-lite"]
+"openrouter/qwen/qwen3.7-flash" = ["openrouter/deepseek/deepseek-v4-flash", "openrouter/openai/gpt-oss-120b"]
+"openrouter/mistralai/mistral-nemo" = ["openrouter/qwen/qwen3.7-flash"]
+"openrouter/google/gemini-2.5-flash-lite" = ["openrouter/deepseek/deepseek-v4-flash"]
+
+[defaults.compaction]
+mode = "chronicle"
+background_threshold = 0.80
+aggressive_threshold = 0.88
+emergency_threshold = 0.95
+
+[defaults.compaction.chronicle]
+interval_messages = 32
+interval_token_fraction = 0.12
+recent_window_hours = 72
+max_recent = 10
+max_older = 16
+context_token_budget = 2200
+expand_message_limit = 100
+max_messages_per_checkpoint = 400
+rollup_threshold = 12
+rollup_batch = 8
+
+[defaults.cortex]
+tick_interval_secs = 300
+worker_wall_clock_timeout_secs = 900
+circuit_breaker_threshold = 3
+
+# Une action contractuelle, financière ou une transmission au Ministère nécessite une approbation humaine.
+[defaults.autonomy]
+level = "suggest"
+interval_secs = 7200
+max_turns = 12
+max_tasks_per_run = 2
+timeout_secs = 900
+warn_secs = 720
+run_history_count = 5
+claim_unowned = false
+
+[defaults.browser]
+enabled = true
+headless = true
+evaluate_enabled = false
+persist_session = false
+close_policy = "close_tabs"
+
+# Chaque agent reçoit ces outils MCP à son démarrage de travail. Ils opèrent sur le même
+# PostgreSQL + pgvector et sont le registre interagent faisant autorité pour les décisions,
+# données factuelles, livrables et pistes d’audit.
+[[defaults.mcp]]
+name = "oasis_shared_memory"
+transport = "http"
+url = "http://oasis-shared-memory:3010/mcp"
+
+[[humans]]
+id = "administration-vdo"
+display_name = "Administration Ville de Val-d'Or"
+role = "Autorité d’approbation du projet OASIS-V2"
+bio = "Approuve toute soumission ministérielle, modification de budget, modification d’échéancier et engagement financier."
+
+[[agents]]
+id = "oasis-coordination"
+display_name = "Coordonnateur OASIS-V2"
+role = "Point d’entrée Web, planification, délégation, consolidation et demande d’approbation."
+default = true
+workspace = "/data/shared-workspace"
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[[agents]]
+id = "oasis-finances"
+display_name = "Analyste financier OASIS-V2"
+role = "Suivi du budget, dépenses, salaires, contrats, appels d’offres, admissibilité et rapprochements."
+workspace = "/data/shared-workspace"
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[[agents]]
+id = "oasis-calendrier"
+display_name = "Planificateur OASIS-V2"
+role = "Calendrier compressé, Gantt, jalons contractuels, dépendances et contrôle des écarts."
+workspace = "/data/shared-workspace"
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[[agents]]
+id = "oasis-pse-sig"
+display_name = "Analyste PSE et SIG OASIS-V2"
+role = "Plan de suivi et d’évaluation, KML, superficies, indicateurs, vulnérabilité et validation méthodologique."
+workspace = "/data/shared-workspace"
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[[agents]]
+id = "oasis-reddition"
+display_name = "Rédacteur de reddition OASIS-V2"
+role = "Rapports d’étape, rapport final, liste des annexes, conformité des livrables et contrôle de qualité rédactionnel."
+workspace = "/data/shared-workspace"
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[[agents]]
+id = "oasis-gouvernance"
+display_name = "Secrétaire du comité de suivi OASIS-V2"
+role = "Comité de suivi, convocations, ordres du jour, procès-verbaux, décisions, responsables, risques et relances."
+workspace = "/data/shared-workspace"
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+# Organisation : l’administration pilote le coordonnateur, qui délègue les analyses spécialisées.
+[[links]]
+from = "administration-vdo"
+to = "oasis-coordination"
+direction = "two_way"
+kind = "hierarchical"
+
+[[links]]
+from = "oasis-coordination"
+to = "oasis-finances"
+direction = "two_way"
+kind = "hierarchical"
+
+[[links]]
+from = "oasis-coordination"
+to = "oasis-calendrier"
+direction = "two_way"
+kind = "hierarchical"
+
+[[links]]
+from = "oasis-coordination"
+to = "oasis-pse-sig"
+direction = "two_way"
+kind = "hierarchical"
+
+[[links]]
+from = "oasis-coordination"
+to = "oasis-reddition"
+direction = "two_way"
+kind = "hierarchical"
+
+[[links]]
+from = "oasis-coordination"
+to = "oasis-gouvernance"
+direction = "two_way"
+kind = "hierarchical"
+
+# Liaisons de pair à pair nécessaires lorsque les livrables se recoupent.
+[[links]]
+from = "oasis-finances"
+to = "oasis-reddition"
+direction = "two_way"
+kind = "peer"
+
+[[links]]
+from = "oasis-pse-sig"
+to = "oasis-reddition"
+direction = "two_way"
+kind = "peer"
+
+[[links]]
+from = "oasis-calendrier"
+to = "oasis-gouvernance"
+direction = "two_way"
+kind = "peer"
+
+[[groups]]
+name = "Pilotage de la convention"
+agent_ids = ["oasis-coordination", "oasis-finances", "oasis-calendrier", "oasis-pse-sig", "oasis-reddition", "oasis-gouvernance"]
+color = "#0F766E"

@@ -1,0 +1,94 @@
+services:
+  oasis-memory-db:
+    image: pgvector/pgvector:pg16
+    container_name: oasis-memory-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: oasis_shared_memory
+      POSTGRES_USER: oasis_memory
+      POSTGRES_PASSWORD: ${OASIS_MEMORY_DB_PASSWORD:?Définir OASIS_MEMORY_DB_PASSWORD dans .env}
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oasis_memory -d oasis_shared_memory"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - oasis_internal
+
+  oasis-shared-memory:
+    build:
+      context: ./shared-memory
+    image: oasis-shared-memory:local
+    container_name: oasis-shared-memory
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "3010"
+      DATABASE_URL: postgresql://oasis_memory:${OASIS_MEMORY_DB_PASSWORD:?Définir OASIS_MEMORY_DB_PASSWORD dans .env}@oasis-memory-db:5432/oasis_shared_memory
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+      OASIS_EMBEDDING_MODEL: ${OASIS_EMBEDDING_MODEL:-qwen/qwen3-embedding-0.6b}
+      OASIS_EMBEDDING_DIMENSIONS: ${OASIS_EMBEDDING_DIMENSIONS:-1024}
+    depends_on:
+      oasis-memory-db:
+        condition: service_healthy
+    expose:
+      - "3010"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3010/health').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - oasis_internal
+
+  spacebot-oasis-v2:
+    image: spacebot-oasis-v2:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: spacebot-oasis-v2
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SPACEBOT_DIR: /data
+      SPACEBOT_DEPLOYMENT: docker
+      SPACEBOT_CRON_TIMEZONE: America/Toronto
+      SPACEBOT_USER_TIMEZONE: America/Toronto
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+    ports:
+      # Interface Web locale. Garder ce bind en localhost sauf si un proxy authentifié est ajouté.
+      - "127.0.0.1:19898:19898"
+    volumes:
+      # Contient config.toml, l'espace partagé, les profils, les bases propres à Spacebot et les journaux.
+      - ./instance:/data
+    depends_on:
+      oasis-shared-memory:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:19898/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    networks:
+      - oasis_internal
+
+networks:
+  oasis_internal:
+    driver: bridge
