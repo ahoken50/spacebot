@@ -80,14 +80,20 @@ assert 'OASIS_SKILLOPT_AUTONOMOUS_ENABLED: ${OASIS_SKILLOPT_AUTONOMOUS_ENABLED:-
 assert 'OASIS_MEMORY_EXPORT_TOKEN: ${OASIS_MEMORY_EXPORT_TOKEN:?Définir OASIS_MEMORY_EXPORT_TOKEN dans .env}' in compose, 'L’export mémoire interne doit exiger un jeton local.'
 assert 'OASIS_REFERENCE_MINER_ENABLED: ${OASIS_REFERENCE_MINER_ENABLED:-true}' in compose, 'Le mineur de références doit être actif par défaut.'
 assert 'OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED: ${OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED:-true}' in compose, 'Le cycle autonome du mineur doit être configurable.'
+assert 'OASIS_AUTONOMOUS_PIPELINE_ENABLED: ${OASIS_AUTONOMOUS_PIPELINE_ENABLED:-true}' in compose, 'Le pipeline autonome doit être activable dans Docker.'
+assert 'OASIS_AUTONOMOUS_PIPELINE_TOKEN: ${OASIS_AUTONOMOUS_PIPELINE_TOKEN:?Définir OASIS_AUTONOMOUS_PIPELINE_TOKEN dans .env}' in compose, 'Les déclenchements internes doivent être authentifiés.'
 reference_miner_server = (ROOT / 'reference-miner' / 'server.js').read_text(encoding='utf-8')
 assert "payload.learning_eligible === true" in reference_miner_server and "payload.completed === true" in reference_miner_server, 'Le mineur doit limiter ses sources aux tâches explicitement admissibles et terminées.'
 assert "policy.auto_promote === true" in reference_miner_server and "promotion: 'blocked_pending_approval'" in reference_miner_server, 'Le mineur ne doit jamais promouvoir un candidat automatiquement.'
+assert 'writeAutonomousPacks' in reference_miner_server and 'callAutonomousRunner' in reference_miner_server, 'Le mineur doit préparer puis évaluer automatiquement les packs temporaires.'
+assert 'autonomous_pipeline !== true' in reference_miner_server, 'Le pipeline doit exiger une autorisation explicite dans la politique.'
+assert "'/internal/autonomous-run'" in optimizer_server, 'DSPy doit exposer seulement un déclencheur interne authentifié pour le pipeline.'
 skillopt_server = (ROOT / 'skillopt' / 'server.js').read_text(encoding='utf-8')
 skillopt_runner = (ROOT / 'skillopt' / 'skillopt_runner.py').read_text(encoding='utf-8')
 assert "OASIS_SKILLOPT_ENABLED ?? 'true'" in skillopt_server, 'Le serveur SkillOpt doit être actif par défaut.'
 assert "runSkillOpt(['autonomous'])" in skillopt_server, 'Le serveur SkillOpt doit prévoir un cycle autonome borné.'
-assert 'status") != "approved"' in skillopt_runner and 'redacted") is not True' in skillopt_runner, 'SkillOpt doit exiger un pack approuvé et dépersonnalisé.'
+assert 'generated_pack = autonomous_pack and ALLOW_AUTONOMOUS_PACKS' in skillopt_runner and 'redacted") is not True' in skillopt_runner, 'SkillOpt doit exiger un pack dépersonnalisé et refuser les packs autonomes non autorisés.'
+assert "'/internal/autonomous-run'" in skillopt_server, 'SkillOpt doit exposer seulement un déclencheur interne authentifié pour le pipeline.'
 assert '"promotion": "blocked_pending_human_approval"' in skillopt_runner, 'SkillOpt ne doit jamais promouvoir une compétence directement.'
 assert 'ALLOWED_SKILLS' in skillopt_runner, 'SkillOpt doit restreindre les compétences auto-évolutives.'
 skillopt_dockerfile = (ROOT / 'skillopt' / 'Dockerfile').read_text(encoding='utf-8')
@@ -149,4 +155,4 @@ for required in [
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: suggest | Taxonomie: 8 catégories | DSPy: actif et supervisé | SkillOpt: autonome borné | Mineur de références: local et sans promotion | Sobriété: activée')
+print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: pipeline borné jusqu’à proposition | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: humaine seulement | Sobriété: activée')

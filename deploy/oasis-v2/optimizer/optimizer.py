@@ -15,7 +15,8 @@ from uuid import uuid4
 
 WORKSPACE = Path(os.environ.get("OASIS_WORKSPACE", "/data/shared-workspace"))
 ROOT = WORKSPACE / "00_systeme" / "optimisation"
-CASES_FILE = ROOT / "reference_cases.approved.json"
+CASES_FILE = Path(os.environ.get("OASIS_OPTIMIZER_REFERENCE_PACK_PATH", ROOT / "reference_cases.approved.json"))
+ALLOW_AUTONOMOUS_PACKS = os.environ.get("OASIS_OPTIMIZER_ALLOW_AUTONOMOUS_PACKS", "false").strip().lower() in {"1", "true", "yes", "on"}
 PROPOSALS_DIR = ROOT / "propositions"
 MAX_CASES = int(os.environ.get("OASIS_OPTIMIZER_MAX_CASES", "12"))
 MAX_CANDIDATES = int(os.environ.get("OASIS_OPTIMIZER_MAX_CANDIDATES", "2"))
@@ -47,8 +48,13 @@ def read_cases() -> list[dict[str, Any]]:
             f"Cas de référence introuvables : {CASES_FILE}. Créer un jeu approuvé et dépersonnalisé avant toute optimisation."
         )
     payload = json.loads(CASES_FILE.read_text(encoding="utf-8"))
-    if payload.get("status") != "approved":
-        raise ValueError("Le jeu de référence doit porter le statut approved.")
+    autonomous_pack = payload.get("autonomous_generated") is True
+    regular_pack = payload.get("status") == "approved"
+    generated_pack = autonomous_pack and ALLOW_AUTONOMOUS_PACKS and payload.get("status") == "system_validated"
+    if not regular_pack and not generated_pack:
+        raise ValueError("Le jeu de référence doit être approved, ou system_validated et explicitement autorisé pour le pipeline autonome.")
+    if autonomous_pack and (payload.get("redacted") is not True or payload.get("scope") != "instruction_appendix_only"):
+        raise ValueError("Un pack DSPy autonome doit confirmer redacted=true et scope=instruction_appendix_only.")
     cases = payload.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("Le jeu de référence doit contenir au moins un cas.")
@@ -208,6 +214,7 @@ def status() -> dict[str, Any]:
         "latest_proposals": [path.name for path in proposals[:10]],
         "limits": {"max_cases": MAX_CASES, "max_candidates": MAX_CANDIDATES, "max_calls": MAX_CALLS},
         "production_promotion": "human_review_only",
+        "autonomous_pack_allowed": ALLOW_AUTONOMOUS_PACKS,
     }
 
 

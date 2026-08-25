@@ -17,7 +17,8 @@ from uuid import uuid4
 WORKSPACE = Path(os.environ.get("OASIS_WORKSPACE", "/data/shared-workspace"))
 SKILL_CATALOG = Path(os.environ.get("OASIS_SKILLOPT_SKILL_CATALOG", "/skill-catalog"))
 ROOT = WORKSPACE / "00_systeme" / "optimisation" / "skillopt"
-PACK_FILE = ROOT / "skillopt_reference_pack.approved.json"
+PACK_FILE = Path(os.environ.get("OASIS_SKILLOPT_REFERENCE_PACK_PATH", ROOT / "skillopt_reference_pack.approved.json"))
+ALLOW_AUTONOMOUS_PACKS = os.environ.get("OASIS_SKILLOPT_ALLOW_AUTONOMOUS_PACKS", "false").strip().lower() in {"1", "true", "yes", "on"}
 PROPOSALS_DIR = ROOT / "propositions"
 RUNS_DIR = ROOT / "runs"
 STATE_FILE = ROOT / "autonomy_state.json"
@@ -101,8 +102,11 @@ def load_pack() -> dict[str, Any]:
     if not PACK_FILE.is_file():
         raise ValueError(f"Jeu SkillOpt introuvable : {PACK_FILE}. Créer puis approuver un jeu dépersonnalisé.")
     pack = read_json(PACK_FILE)
-    if pack.get("status") != "approved":
-        raise ValueError("Le jeu SkillOpt doit porter le statut approved.")
+    autonomous_pack = pack.get("autonomous_generated") is True
+    regular_pack = pack.get("status") == "approved"
+    generated_pack = autonomous_pack and ALLOW_AUTONOMOUS_PACKS and pack.get("status") == "system_validated"
+    if not regular_pack and not generated_pack:
+        raise ValueError("Le jeu SkillOpt doit être approved, ou system_validated et explicitement autorisé par le pipeline autonome.")
     if pack.get("redacted") is not True:
         raise ValueError("Le jeu SkillOpt doit confirmer redacted=true.")
     if pack.get("scope") != "skill_text_only":
@@ -405,6 +409,7 @@ def status() -> dict[str, Any]:
         "state": read_json(STATE_FILE, {}),
         "limits": limits(),
         "production_promotion": "human_review_only",
+        "autonomous_pack_allowed": ALLOW_AUTONOMOUS_PACKS,
     }
 
 

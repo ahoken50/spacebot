@@ -12,14 +12,15 @@ const runnerPath = new URL('./skillopt_runner.py', import.meta.url).pathname;
 const enabled = !['0', 'false', 'no', 'off'].includes((process.env.OASIS_SKILLOPT_ENABLED ?? 'true').trim().toLowerCase());
 const autonomousEnabled = !['0', 'false', 'no', 'off'].includes((process.env.OASIS_SKILLOPT_AUTONOMOUS_ENABLED ?? 'true').trim().toLowerCase());
 const autonomousIntervalHours = Math.max(1, Number.parseInt(process.env.OASIS_SKILLOPT_INTERVAL_HOURS ?? '24', 10) || 24);
+const autonomousPipelineToken = process.env.OASIS_AUTONOMOUS_PIPELINE_TOKEN ?? '';
 
 function textResult(value) {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
 }
 
-async function runSkillOpt(args) {
+async function runSkillOpt(args, overrides = {}) {
   const { stdout, stderr } = await execFileAsync('python3', [runnerPath, ...args], {
-    env: { ...process.env, OASIS_WORKSPACE: workspace },
+    env: { ...process.env, OASIS_WORKSPACE: workspace, ...overrides },
     timeout: 660_000,
     maxBuffer: 4 * 1024 * 1024,
   });
@@ -91,12 +92,34 @@ app.post('/mcp', async (req, res) => {
   await server.connect(transport);
   await transport.handleRequest(req, res, req.body);
 });
+app.post('/internal/autonomous-run', async (req, res) => {
+  if (!enabled || !autonomousPipelineToken || req.get('authorization') !== `Bearer ${autonomousPipelineToken}`) {
+    res.status(403).json({ error: 'Autonomous pipeline not authorized' });
+    return;
+  }
+  const referencePackPath = String(req.body?.reference_pack_path ?? '');
+  if (!referencePackPath.startsWith(`${workspace}/00_systeme/optimisation/reference-miner/`)) {
+    res.status(400).json({ error: 'Invalid autonomous reference pack path' });
+    return;
+  }
+  try {
+    const result = await runSkillOpt(['autonomous'], {
+      OASIS_SKILLOPT_REFERENCE_PACK_PATH: referencePackPath,
+      OASIS_SKILLOPT_ALLOW_AUTONOMOUS_PACKS: 'true',
+    });
+    res.status(200).json({ status: 'completed', promotion: 'blocked_pending_human_approval', result });
+  } catch (error) {
+    res.status(422).json({ status: 'failed', error: String(error.message ?? error) });
+  }
+});
+
 app.get('/healthz', (_req, res) => res.status(200).json({
   status: 'ok',
   service: 'oasis-skillopt',
   enabled,
   autonomous_enabled: autonomousEnabled,
   interval_hours: autonomousIntervalHours,
+  autonomous_pipeline: Boolean(autonomousPipelineToken),
 }));
 app.listen(port, '0.0.0.0', () => {
   console.log(`oasis-skillopt listening on ${port}`);

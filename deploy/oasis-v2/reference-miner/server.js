@@ -15,8 +15,13 @@ const autonomousEnabled = isEnabled(process.env.OASIS_REFERENCE_MINER_AUTONOMOUS
 const maxCandidates = Number.parseInt(process.env.OASIS_REFERENCE_MINER_MAX_CANDIDATES ?? '3', 10);
 const maxRunsPerDay = Number.parseInt(process.env.OASIS_REFERENCE_MINER_MAX_RUNS_PER_DAY ?? '1', 10);
 const cycleHours = Number.parseInt(process.env.OASIS_REFERENCE_MINER_CYCLE_HOURS ?? '24', 10);
+const autonomousPipelineEnabled = isEnabled(process.env.OASIS_AUTONOMOUS_PIPELINE_ENABLED, false);
+const autonomousPipelineToken = process.env.OASIS_AUTONOMOUS_PIPELINE_TOKEN ?? '';
+const optimizerUrl = process.env.OASIS_OPTIMIZER_AUTONOMOUS_URL ?? 'http://oasis-optimizer:3013/internal/autonomous-run';
+const skilloptUrl = process.env.OASIS_SKILLOPT_AUTONOMOUS_URL ?? 'http://oasis-skillopt:3014/internal/autonomous-run';
 
 const root = path.join(workspace, '00_systeme', 'optimisation', 'reference-miner');
+const autonomousDir = path.join(root, 'autonomous-packs');
 const policyPath = path.join(root, 'reference_mining_policy.approved.json');
 const statePath = path.join(root, 'autonomy_state.json');
 const dspyCandidatesPath = path.join(root, 'dspy_candidates.json');
@@ -213,14 +218,85 @@ async function mineCandidates({ autonomous = false } = {}) {
   };
 }
 
+function groupCandidates(candidates, key) {
+  const groups = new Map();
+  for (const candidate of candidates) {
+    const value = String(candidate[key] ?? '');
+    if (!value) continue;
+    const group = groups.get(value) ?? [];
+    group.push(candidate);
+    groups.set(value, group);
+  }
+  return [...groups.entries()].sort((left, right) => right[1].length - left[1].length || left[0].localeCompare(right[0]));
+}
+
+async function writeAutonomousPacks() {
+  const [dspyPayload, skilloptPayload] = await Promise.all([
+    readJson(dspyCandidatesPath, { candidates: [] }),
+    readJson(skilloptCandidatesPath, { candidates: [] }),
+  ]);
+  const createdAt = nowIso();
+  const outputs = {};
+  const dspyGroup = groupCandidates(dspyPayload.candidates ?? [], 'agent_id').find(([, candidates]) => candidates.length >= 1);
+  if (dspyGroup) {
+    const [agentId, candidates] = dspyGroup;
+    const packPath = path.join(autonomousDir, 'dspy_reference_cases.system_validated.json');
+    await writeJson(packPath, {
+      schema_version: '1.0', status: 'system_validated', autonomous_generated: true, redacted: true,
+      scope: 'instruction_appendix_only', auto_execute: true, created_at: createdAt, agent_id: agentId,
+      source: 'oasis-reference-miner', promotion: 'blocked_pending_human_approval',
+      cases: candidates.slice(0, 2).map(({ id, agent_id, task_input, baseline_instruction, expected, source_record_id, source_references }) => ({ id, agent_id, task_input, baseline_instruction, expected, source_record_id, source_references })),
+    });
+    outputs.dspy = packPath;
+  }
+  const skilloptGroup = groupCandidates(skilloptPayload.candidates ?? [], 'skill_id').find(([, candidates]) => candidates.length >= 3);
+  if (skilloptGroup) {
+    const [skillId, candidates] = skilloptGroup;
+    const partition = (candidate) => ({ id: candidate.id, task_input: candidate.task_input, expected: candidate.expected, source_record_id: candidate.source_record_id, source_references: candidate.source_references });
+    const packPath = path.join(autonomousDir, 'skillopt_reference_pack.system_validated.json');
+    await writeJson(packPath, {
+      schema_version: '1.0', status: 'system_validated', autonomous_generated: true, redacted: true,
+      scope: 'skill_text_only', autonomous_learning: true, created_at: createdAt, skill_id: skillId,
+      source: 'oasis-reference-miner', promotion: 'blocked_pending_human_approval',
+      training_cases: [partition(candidates[0])], validation_cases: [partition(candidates[1])], holdout_cases: [partition(candidates[2])],
+    });
+    outputs.skillopt = packPath;
+  }
+  return outputs;
+}
+
+async function callAutonomousRunner(url, referencePackPath) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${autonomousPipelineToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reference_pack_path: referencePackPath }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`${url} a refusé le pack autonome : ${payload.error ?? response.status}`);
+  return payload;
+}
+
 async function autonomousCycle() {
   if (!enabled || !autonomousEnabled) return { started: false, reason: 'miner_disabled' };
   const policy = await loadPolicy();
   if (policy.autonomous_mining !== true) return { started: false, reason: 'policy_autonomous_mining_not_enabled' };
+  if (policy.autonomous_pipeline !== true || !autonomousPipelineEnabled) return { started: false, reason: 'autonomous_pipeline_not_enabled' };
+  if (!autonomousPipelineToken) return { started: false, reason: 'autonomous_pipeline_token_missing' };
   const state = await readJson(statePath, {});
   const runsToday = state.day === today() ? Number(state.runs_today ?? 0) : 0;
   if (runsToday >= maxRunsPerDay) return { started: false, reason: 'daily_limit_reached', runs_today: runsToday };
-  const result = await mineCandidates({ autonomous: true });
+  const mining = await mineCandidates({ autonomous: true });
+  const packs = await writeAutonomousPacks();
+  const evaluations = {};
+  if (packs.dspy) {
+    try { evaluations.dspy = await callAutonomousRunner(optimizerUrl, packs.dspy); }
+    catch (error) { evaluations.dspy = { status: 'failed', error: String(error.message ?? error) }; }
+  }
+  if (packs.skillopt) {
+    try { evaluations.skillopt = await callAutonomousRunner(skilloptUrl, packs.skillopt); }
+    catch (error) { evaluations.skillopt = { status: 'failed', error: String(error.message ?? error) }; }
+  }
+  const result = { mining, packs, evaluations, promotion: 'blocked_pending_human_approval' };
   await writeJson(statePath, { day: today(), runs_today: runsToday + 1, last_run_at: nowIso(), last_result: result });
   return { started: true, ...result };
 }
@@ -238,6 +314,7 @@ async function status() {
     policy_present: policy !== null,
     policy_status: policy?.status ?? null,
     autonomous_mining: policy?.autonomous_mining === true,
+    autonomous_pipeline: policy?.autonomous_pipeline === true && autonomousPipelineEnabled,
     dspy_candidate_count: Array.isArray(dspyCandidates.candidates) ? dspyCandidates.candidates.length : 0,
     skillopt_candidate_count: Array.isArray(skilloptCandidates.candidates) ? skilloptCandidates.candidates.length : 0,
     state,

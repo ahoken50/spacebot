@@ -111,6 +111,7 @@ services:
       OASIS_OPTIMIZER_MAX_CASES: ${OASIS_OPTIMIZER_MAX_CASES:-2}
       OASIS_OPTIMIZER_MAX_CANDIDATES: ${OASIS_OPTIMIZER_MAX_CANDIDATES:-1}
       OASIS_OPTIMIZER_MAX_CALLS: ${OASIS_OPTIMIZER_MAX_CALLS:-8}
+      OASIS_AUTONOMOUS_PIPELINE_TOKEN: ${OASIS_AUTONOMOUS_PIPELINE_TOKEN:?Définir OASIS_AUTONOMOUS_PIPELINE_TOKEN dans .env}
     volumes:
       - ./instance/shared-workspace:/workspace:rw
     expose:
@@ -155,6 +156,7 @@ services:
       OASIS_SKILLOPT_TIMEOUT_SECONDS: ${OASIS_SKILLOPT_TIMEOUT_SECONDS:-600}
       OASIS_SKILLOPT_OPTIMIZER_MODEL: ${OASIS_SKILLOPT_OPTIMIZER_MODEL:-qwen/qwen3.7-flash}
       OASIS_SKILLOPT_TARGET_MODEL: ${OASIS_SKILLOPT_TARGET_MODEL:-qwen/qwen3.7-flash}
+      OASIS_AUTONOMOUS_PIPELINE_TOKEN: ${OASIS_AUTONOMOUS_PIPELINE_TOKEN:?Définir OASIS_AUTONOMOUS_PIPELINE_TOKEN dans .env}
     volumes:
       - ./instance/shared-workspace:/workspace:rw
       - ./profile-skills:/skill-catalog:ro
@@ -192,10 +194,18 @@ services:
       OASIS_REFERENCE_MINER_CYCLE_HOURS: ${OASIS_REFERENCE_MINER_CYCLE_HOURS:-24}
       OASIS_REFERENCE_MINER_MAX_CANDIDATES: ${OASIS_REFERENCE_MINER_MAX_CANDIDATES:-3}
       OASIS_REFERENCE_MINER_MAX_RUNS_PER_DAY: ${OASIS_REFERENCE_MINER_MAX_RUNS_PER_DAY:-1}
+      OASIS_AUTONOMOUS_PIPELINE_ENABLED: ${OASIS_AUTONOMOUS_PIPELINE_ENABLED:-true}
+      OASIS_AUTONOMOUS_PIPELINE_TOKEN: ${OASIS_AUTONOMOUS_PIPELINE_TOKEN:?Définir OASIS_AUTONOMOUS_PIPELINE_TOKEN dans .env}
+      OASIS_OPTIMIZER_AUTONOMOUS_URL: http://oasis-optimizer:3013/internal/autonomous-run
+      OASIS_SKILLOPT_AUTONOMOUS_URL: http://oasis-skillopt:3014/internal/autonomous-run
     volumes:
       - ./instance/shared-workspace:/workspace:rw
     depends_on:
       oasis-shared-memory:
+        condition: service_healthy
+      oasis-optimizer:
+        condition: service_healthy
+      oasis-skillopt:
         condition: service_healthy
     expose:
       - "3015"

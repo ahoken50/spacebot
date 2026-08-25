@@ -4,6 +4,7 @@
   "reviewed_at": "",
   "allow_reference_mining": false,
   "autonomous_mining": false,
+  "autonomous_pipeline": false,
   "redaction_required": true,
   "auto_promote": false,
   "allowed_record_types": [
@@ -29,5 +30,5 @@
     "secrets ou identifiants",
     "preuves non vérifiées"
   ],
-  "notes": "Copier ce fichier sous le nom reference_mining_policy.approved.json, vérifier les types d’enregistrements autorisés, renseigner le réviseur puis définir status=approved et allow_reference_mining=true. Définir autonomous_mining=true uniquement après un premier essai manuel. auto_promote doit rester false."
+  "notes": "Copier ce fichier sous le nom reference_mining_policy.approved.json, vérifier les types d’enregistrements autorisés, renseigner le réviseur puis définir status=approved et allow_reference_mining=true. Définir autonomous_mining=true et autonomous_pipeline=true uniquement après un premier essai manuel. Le pipeline peut produire et évaluer automatiquement des propositions, mais auto_promote doit rester false."
 }
