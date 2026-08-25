@@ -1,0 +1,18 @@
+{
+  "proposal_id": "capability-<agent-id>-<yyyymmdd>-<nom-court>",
+  "kind": "capability_skill_acquisition",
+  "status": "pending_approval",
+  "created_at": "<ISO-8601-UTC>",
+  "target_agent_id": "<agent-id-oasis>",
+  "skill_source": "<owner>/<repo>[/<skill-name>]",
+  "review_summary": "Besoin, capacité locale vérifiée, résultat de recherche, dépendances, permissions, données accessibles, test prévu et plan de retrait.",
+  "constraints": {
+    "workspace_skill_only": true,
+    "mcp_change": false,
+    "model_change": false,
+    "docker_change": false,
+    "permissions_change": false,
+    "secret_change": false,
+    "system_dependency_change": false
+  }
+}

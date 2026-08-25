@@ -12,6 +12,7 @@ fi
 
 mkdir -p "${INSTANCE_DIR}/agents" \
   "${SHARED_WORKSPACE}/00_systeme/propositions_capacites" \
+  "${SHARED_WORKSPACE}/00_systeme/scripts" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/propositions" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/propositions" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/runs" \
@@ -137,42 +138,42 @@ write_profile \
   "Coordonnateur OASIS-V2" \
   "Recevoir les demandes depuis l’interface Web, clarifier l’objectif, créer un plan de travail, déléguer aux profils appropriés, consolider les résultats et demander les approbations requises. Maintenir la cohérence entre budget, calendrier, PSE, rapports et comité." \
   "Rester orienté vers le résultat fini, vérifiable et utile à la Ville. Préserver la traçabilité de toute décision, ne pas court-circuiter l’expertise des profils spécialisés, et résumer les arbitrages à l’administration." \
-  "oasis-coordination oasis-financial-control oasis-schedule-governance oasis-pse-sig oasis-reporting oasis-document-studio oasis-supervised-optimization oasis-skillopt-learning oasis-reference-case-mining oasis-failure-learning"
+  "oasis-coordination oasis-financial-control oasis-schedule-governance oasis-pse-sig oasis-reporting oasis-document-studio oasis-supervised-optimization oasis-skillopt-learning oasis-reference-case-mining oasis-failure-learning oasis-python-workbench"
 
 write_profile \
   "oasis-finances" \
   "Analyste financier OASIS-V2" \
   "Assurer le suivi du budget approuvé, des dépenses réelles, salaires, charges sociales, contrats, appels d’offres, sources de financement, admissibilité et plafonds. Préparer les rapprochements et signaux d’écart destinés à la reddition." \
   "Privilégier les montants sourcés, les dates de facture, les preuves de paiement et les codes budgétaires. Distinguer clairement prévision, engagement, dépense engagée, dépense payée et dépense admissible." \
-  "oasis-financial-control oasis-reporting oasis-document-studio oasis-failure-learning"
+  "oasis-financial-control oasis-reporting oasis-document-studio oasis-failure-learning oasis-python-workbench"
 
 write_profile \
   "oasis-calendrier" \
   "Planificateur OASIS-V2" \
   "Maintenir le calendrier approuvé, appliquer la compression demandée à compter du 1er septembre sans prolonger la durée globale, produire le Gantt, suivre les dépendances, jalons de reddition, avis de dérive et actions correctives." \
   "Ne pas déplacer un jalon contractuel ou modifier le calendrier officiel sans l’identifier comme proposition soumise à autorisation. Distinguer toujours la version approuvée, la version de travail et les écarts constatés." \
-  "oasis-schedule-governance oasis-reporting oasis-document-studio oasis-failure-learning"
+  "oasis-schedule-governance oasis-reporting oasis-document-studio oasis-failure-learning oasis-python-workbench"
 
 write_profile \
   "oasis-pse-sig" \
   "Analyste PSE et SIG OASIS-V2" \
   "Élaborer et mettre à jour le PSE à partir du gabarit ministériel, analyser le KML, calculer et valider les superficies, traiter les indicateurs d’infrastructures vertes et documenter la méthode pour l’indicateur de vulnérabilité aux vagues de chaleur." \
   "Conserver la méthode de calcul, les systèmes de coordonnées, les sources de données et les limites d’interprétation. Marquer toute superficie issue d’un export de CAO comme à valider tant que la couche SIG et les emprises ne sont pas clairement attribuées." \
-  "oasis-pse-sig oasis-document-studio oasis-failure-learning"
+  "oasis-pse-sig oasis-document-studio oasis-failure-learning oasis-python-workbench"
 
 write_profile \
   "oasis-reddition" \
   "Rédacteur de reddition OASIS-V2" \
   "Préparer les brouillons de PSE, rapports d’étape et rapport final; vérifier les rubriques, annexes, périodes, états financiers, calendrier joint, évaluation de résilience et cohérence du contenu avec le budget et les indicateurs." \
   "Rédiger de façon administrative, concise et fondée sur les preuves. Tenir une liste d’annexes et de données manquantes. Ne jamais affirmer qu’un résultat est atteint sans pièce vérifiable dans le registre commun." \
-  "oasis-reporting oasis-document-studio oasis-financial-control oasis-pse-sig oasis-failure-learning"
+  "oasis-reporting oasis-document-studio oasis-financial-control oasis-pse-sig oasis-failure-learning oasis-python-workbench"
 
 write_profile \
   "oasis-gouvernance" \
   "Secrétaire du comité de suivi OASIS-V2" \
   "Organiser le comité de suivi, préparer convocations et ordres du jour, rédiger les procès-verbaux, tenir les décisions, responsables, échéances, risques et relances; préparer l’invitation du représentant ministériel lorsqu’applicable." \
   "Faire ressortir clairement ce qui est décidé, à faire, en attente ou à escalader. Un procès-verbal est un brouillon jusqu’à validation par la personne responsable; ne jamais en simuler l’adoption." \
-  "oasis-governance oasis-schedule-governance oasis-document-studio oasis-failure-learning"
+  "oasis-governance oasis-schedule-governance oasis-document-studio oasis-failure-learning oasis-python-workbench"
 
 cat > "${SHARED_WORKSPACE}/README.md" <<'EOF'
 # Espace documentaire commun — OASIS-V2
@@ -184,6 +185,8 @@ Les documents confidentiels, clés API et mots de passe ne doivent jamais être 
 Le mineur de références ne lit que les enregistrements partagés `approved`, `completed=true` et `learning_eligible=true`. Il écrit ses candidats séparément dans `00_systeme/optimisation/reference-miner/`; ces fichiers ne sont jamais des packs actifs DSPy ou SkillOpt. Le pont d’approbation conserve les décisions et promotions validées dans `00_systeme/optimisation/approval-bridge/promotions/`.
 
 La boucle de remédiation lit uniquement les tâches Spacebot à l’état `failed` et leurs résumés de tentatives durables. Elle dépersonnalise le diagnostic, supprime les répétitions et crée une leçon candidate dans `00_systeme/optimisation/failure-remediator/proposals/`. Toute leçon reste bloquée jusqu’à **Approve** dans l’interface; les audits sont dans `failure-remediator/audits/`. Les compétences approuvées sont conservées dans `instance/approved-skill-overlays/` et réinstallées à chaque bootstrap.
+
+Les scripts Python créés par les profils vont dans `00_systeme/scripts/<agent-id>/`. Ils doivent être accompagnés d’un README, rester dans le workspace, être compilés avec `python3 -m py_compile` et ne pas introduire de dépendance sans approbation. Les agents peuvent rechercher les compétences manquantes avec l’outil natif `skills_search`, mais une installation externe ou une capacité partagée suit la revue indiquée dans `00_systeme/propositions_capacites/`.
 EOF
 
 cat > "${INSTANCE_DIR}/README-local.md" <<'EOF'

@@ -53,6 +53,8 @@ assert opencode['permissions'] == {'edit': 'allow', 'bash': 'allow', 'webfetch':
 assert 'opencode-ai@${OPENCODE_VERSION}' in root_dockerfile, 'Le binaire OpenCode versionné doit être inclus dans l’image.'
 assert 'COPY --from=builder /root/.bun /root/.bun' in root_dockerfile, 'Bun et OpenCode doivent être copiés dans l’image runtime.'
 assert 'ENV PATH="/root/.bun/bin:${PATH}"' in root_dockerfile, 'Le chemin runtime d’OpenCode doit être déclaré.'
+for package in ('python3', 'python3-venv', 'python3-pip'):
+    assert package in root_dockerfile, f'Python runtime manquant dans l’image Spacebot : {package}'
 
 mcp = {entry['name']: entry['url'] for entry in config['defaults']['mcp']}
 assert mcp == {'oasis_shared_memory': 'http://oasis-shared-memory:3010/mcp'}, 'La mémoire commune doit être l’unique MCP partagé par défaut.'
@@ -122,12 +124,27 @@ assert "task?.status === 'ready'" in approval_bridge and "applied_after_spacebot
 assert "blocked_rejected_in_spacebot_ui" in approval_bridge, 'Le rejet UI doit bloquer durablement la promotion.'
 assert "failure_remediation" in approval_bridge and "promoteFailureRemediation" in approval_bridge, 'Le pont doit soumettre les leçons d’échec à la même approbation UI.'
 assert "approved-skill-overlays" in approval_bridge and "persistAndInstallSkill" in approval_bridge, 'Les promotions approuvées doivent survivre au bootstrap.'
+assert "capability_skill_acquisition" in approval_bridge and "authorizeCapabilitySkill" in approval_bridge, 'Le pont doit soumettre les compétences externes à l’approbation UI.'
+assert "approved_for_agent_install" in approval_bridge and "workspace_skill_only" in approval_bridge, 'Une compétence externe approuvée doit rester limitée au workspace.'
 failure_remediator = (ROOT / 'failure-remediator' / 'server.js').read_text(encoding='utf-8')
 assert "'/tasks?limit=500'" in failure_remediator and '/tasks/${taskNumber}/attempts' in failure_remediator, 'La boucle doit lire les tâches et leurs tentatives Spacebot.'
 assert "missing_or_unavailable_mcp" in failure_remediator and "missing_tool" in failure_remediator and "prompt_or_context_unclear" in failure_remediator, 'Les catégories de diagnostic requises sont absentes.'
 assert "repeat_suppressed" in failure_remediator and "maxProposalsPerDay" in failure_remediator, 'La boucle doit supprimer les répétitions et appliquer un plafond.'
 assert "[courriel retiré]" in failure_remediator and "[secret retiré]" in failure_remediator, 'Les résumés d’échec doivent être dépersonnalisés.'
 assert "auto_promote: false" in failure_remediator and "mcp_change: false" in failure_remediator, 'Une leçon ne doit jamais modifier automatiquement une capacité.'
+capability_skill = (ROOT / 'skills' / 'oasis-capability-discovery' / 'SKILL.md').read_text(encoding='utf-8')
+capability_template = ROOT / 'skills' / 'oasis-capability-discovery' / 'templates' / 'capability_skill_acquisition.template.json'
+assert capability_template.is_file(), 'Le gabarit de demande de compétence externe est requis.'
+capability_template_data = json.loads(capability_template.read_text(encoding='utf-8'))
+assert capability_template_data['kind'] == 'capability_skill_acquisition' and capability_template_data['constraints']['workspace_skill_only'] is True, 'Le gabarit de compétence externe est invalide.'
+assert 'capability_skill_acquisition' in capability_skill and 'skills_search(action="search")' in capability_skill, 'La découverte contrôlée doit inclure la recherche et l’approbation des compétences externes.'
+python_skill = ROOT / 'profile-skills' / 'oasis-python-workbench' / 'SKILL.md'
+python_scaffold = ROOT / 'profile-skills' / 'oasis-python-workbench' / 'scripts' / 'scaffold_oasis_python_script.py'
+assert python_skill.is_file() and python_scaffold.is_file(), 'La compétence Python et son générateur sont requis.'
+assert 'python3 -m py_compile' in python_skill.read_text(encoding='utf-8'), 'La compétence Python doit exiger une compilation de contrôle.'
+bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
+assert bootstrap.count('oasis-python-workbench') == 6, 'La compétence Python doit être préchargée pour les six profils.'
+assert '00_systeme/scripts' in bootstrap, 'Le répertoire de scripts OASIS doit être initialisé.'
 optimizer_dockerfile = (ROOT / 'optimizer' / 'Dockerfile').read_text(encoding='utf-8')
 assert 'FROM oven/bun:1.3.4-alpine' in optimizer_dockerfile, 'L’image DSPy doit être alignée sur Bun 1.3.4.'
 
@@ -161,12 +178,14 @@ for required in [
     ROOT / 'approval-bridge' / 'package.json',
     ROOT / 'approval-bridge' / 'server.js',
     ROOT / 'approval-bridge' / 'test_failure_remediation.mjs',
+    ROOT / 'approval-bridge' / 'test_capability_skill_acquisition.mjs',
     ROOT / 'failure-remediator' / 'Dockerfile',
     ROOT / 'failure-remediator' / 'package.json',
     ROOT / 'failure-remediator' / 'server.js',
     ROOT / 'failure-remediator' / 'test_integration.mjs',
     ROOT / 'skills' / 'oasis-foundation' / 'SKILL.md',
     ROOT / 'skills' / 'oasis-capability-discovery' / 'SKILL.md',
+    ROOT / 'skills' / 'oasis-capability-discovery' / 'templates' / 'capability_skill_acquisition.template.json',
     ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-financial-control' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-schedule-governance' / 'SKILL.md',
@@ -178,8 +197,10 @@ for required in [
     ROOT / 'profile-skills' / 'oasis-skillopt-learning' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-reference-case-mining' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-failure-learning' / 'SKILL.md',
+    ROOT / 'profile-skills' / 'oasis-python-workbench' / 'SKILL.md',
+    ROOT / 'profile-skills' / 'oasis-python-workbench' / 'scripts' / 'scaffold_oasis_python_script.py',
 ]:
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: apprentissage après échec jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')
+print('Agents: 6 | MCP ciblés | OpenCode/Python: activés | Routage: OpenRouter sans Claude | Autonomie: apprentissage et acquisition de compétences jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')

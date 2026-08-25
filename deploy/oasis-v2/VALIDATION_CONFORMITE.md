@@ -2,7 +2,7 @@
 
 **Date de contrôle :** 25 août 2026
 
-**Portée :** configuration locale Docker, profils OASIS, modèles OpenRouter, liens, mémoire SQL‑vectorielle, MCP, OpenCode, SIG, production documentaire, compétences et chaîne autonome de découverte, évaluation DSPy/SkillOpt, remédiation dépersonnalisée après échec, demande d’approbation dans l’interface et promotion contrôlée.
+**Portée :** configuration locale Docker, profils OASIS, modèles OpenRouter, liens, mémoire SQL‑vectorielle, MCP, OpenCode, Python local, SIG, production documentaire, compétences et chaîne autonome de découverte, évaluation DSPy/SkillOpt, remédiation dépersonnalisée après échec, recherche contrôlée de compétences, demande d’approbation dans l’interface et promotion contrôlée.
 
 ## Résultat synthétique
 
@@ -15,13 +15,15 @@ La configuration est **cohérente avec les mécanismes présents dans le dépôt
 | Contexte et coûts | Conforme | Chronicle, limites de tours, mémoire automatique désactivée, outils MCP ciblés et quotas d’optimisation. |
 | Liens et MCP | Conforme | Mémoire commune par défaut; outils SIG, documentaires et d’optimisation attribués seulement aux profils qui en ont besoin. |
 | OpenCode | Conforme par revue statique | Binaire ajouté à l’image; serveur unique, webfetch désactivé, mise à jour et LSP implicites désactivés. |
-| Compétences | Conforme | Socle commun, compétences spécialisées par profil, découverte contrôlée et rechargement géré par Spacebot. |
+| Compétences | Conforme | Socle commun, compétences spécialisées par profil, recherche contrôlée, acquisition externe soumise à tâche UI et rechargement géré par Spacebot. |
+| Scripts Python | Conforme par revue statique et essai de générateur | Python 3 dans l’image, terminal sandboxé, scripts classés dans le workspace, compilation obligatoire et dépendances interdites sans approbation. |
 | SIG | Conforme sous réserve SIG | Analyse KML, export GeoJSON et intersections locales; P1/P2/P3 validés restent nécessaires pour une superficie officielle. |
 | Documents | Conforme | Génération DOCX/PDF locale, taxonomie, aperçu et contrôle qualité. |
 | Optimisation DSPy | Conforme et bornée | Évaluation manuelle ou déclenchée par pack temporaire authentifié, propositions `pending_approval`, sans promotion automatique. |
 | Apprentissage SkillOpt | Conforme par revue statique et test sans LLM | Compétence `SKILL.md` autorisée, partitions train/validation/holdout séparées, score déterministe, exécution autonome plafonnée et promotion bloquée. |
 | Pipeline de références | Conforme par revue statique et test de packs | Lit seulement les enregistrements `approved`, `completed` et `learning_eligible`, dépersonnalise/dédoublonne, partitionne et déclenche les évaluations. |
 | Pont d’approbation UI | Conforme par revue statique | Crée une tâche Spacebot `pending_approval`, traite exclusivement `ready` comme approbation, archive un rejet `backlog` et applique la candidate seulement après l’action utilisateur. |
+| Compétence externe | Conforme par revue statique et test simulé | Une recherche crée une demande `capability_skill_acquisition`; **Approve** autorise seulement l’agent ciblé à appeler `install_skill` dans son workspace, sans installation par le pont. |
 | Boucle après échec | Conforme par revue statique et test simulé | Lit la dernière tentative durable `failed`/`blocked`/`timed_out`, retire les données sensibles, classe la cause, déduplique sa signature et soumet uniquement une leçon candidate à l’interface. |
 
 ## Conformité aux mécanismes du moteur
@@ -41,7 +43,8 @@ La structure suit les mécanismes documentés et implémentés par Spacebot. Les
 | Optimiseur DSPy | 2 cas, 1 candidat, 8 appels | Rend les itérations d’instructions contrôlables et peu coûteuses. |
 | SkillOpt | 2/2/2 cas train/validation/holdout, 1 époque, 1 exécution/jour | Apprentissage autonome d’une procédure spécialisée, avec score séparé et sortie `pending_approval`. |
 | Pipeline de références | 3 candidats par cible, 1 exécution/jour | Découverte locale, préparation de packs temporaires et évaluations DSPy/SkillOpt bornées. |
-| Pont d’approbation | Vérification toutes les 60 secondes | Création d’une tâche UI, promotion seulement après `pending_approval → ready`, audit local de promotion ou de rejet. |
+| Pont d’approbation | Vérification toutes les 60 secondes | Création d’une tâche UI, promotion seulement après `pending_approval → ready`, audit local de promotion ou de rejet; autorisation ciblée des compétences externes. |
+| Scripts Python | Python 3, `venv`, `pip`, script local par profil | Création et exécution dans le workspace seulement; compilation et essai obligatoire; aucune dépendance ajoutée sans approbation. |
 | Remédiation après échec | Vérification toutes les 120 secondes, 3 propositions/jour | Dernière tentative seulement, dépersonnalisation, signature anti-répétition, aucune relance ou modification de capacité automatique. |
 
 ## Tests exécutés
@@ -59,6 +62,8 @@ La structure suit les mécanismes documentés et implémentés par Spacebot. Les
 | Pont d’approbation UI | Revue statique réussie : création de tâche `pending_approval`, promotion seulement après état `ready`, rejet `backlog` et transitions `ready → in_progress → done` vérifiés dans le contrat API Spacebot. |
 | Initialisation complète de l’instance avec environnement fictif | Réussie : compétences, espaces DSPy/SkillOpt/mineur/remédiateur/pont d’approbation, gabarits et taxonomie créés puis nettoyés. |
 | Test d’intégration du remédiateur d’échec | Réussi avec une API Spacebot simulée : première erreur → proposition `pending_approval` dépersonnalisée; seconde lecture → `already_processed`, sans doublon. |
+| Test du générateur de script Python | Réussi : création dans `00_systeme/scripts/<agent>/`, README, compilation `py_compile` et aide CLI. |
+| Test d’acquisition de compétence | Réussi avec API Spacebot simulée : `pending_approval` → `ready` → autorisation auditée `approved_for_agent_install`, sans écriture de compétence par le pont. |
 | Compilation Rust complète | Non exécutée : le dépôt exige Rust Edition 2024, alors que l’environnement de validation fournit Cargo 1.75. Le code applicatif n’a pas été modifié; le blocage est uniquement lié à la version de l’outil local. |
 | Construction et démarrage Docker | À exécuter sur la machine municipale : Docker n’est pas installé dans l’environnement de validation. |
 
@@ -66,7 +71,7 @@ La structure suit les mécanismes documentés et implémentés par Spacebot. Les
 
 La personne responsable doit fournir une clé OpenRouter, un mot de passe PostgreSQL fort, un jeton aléatoire `OASIS_MEMORY_EXPORT_TOKEN`, un second jeton `OASIS_AUTONOMOUS_PIPELINE_TOKEN`, un troisième jeton `OASIS_APPROVAL_BRIDGE_TOKEN` et un quatrième jeton `OASIS_FAILURE_REMEDIATOR_TOKEN` dans `.env`, lancer `./bootstrap_instance.sh`, puis exécuter `docker compose up -d --build`. Elle doit ensuite vérifier les états de santé de `oasis-memory-db`, `oasis-shared-memory`, `oasis-gis`, `oasis-document-studio`, `oasis-optimizer`, `oasis-skillopt`, `oasis-reference-miner`, `oasis-failure-remediator`, `oasis-approval-bridge` et l’accès à l’interface Web sur `127.0.0.1:19898`.
 
-Avant d’activer le pipeline, copier sa politique de référence, la faire approuver, puis conserver `reference_mining_policy.approved.json` dans `00_systeme/optimisation/reference-miner/`; définir `autonomous_mining=true` et `autonomous_pipeline=true`, mais conserver impérativement `auto_promote=false`. Marquer une tâche source comme admissible seulement après sa clôture et son approbation, avec `completed=true`, `learning_eligible=true`, références de source et critères `reference_expected`; ajouter `agent_id` et `baseline_instruction` pour DSPy, ou `skill_id` pour SkillOpt. Le pipeline prépare, évalue et dépose alors les propositions sans autre intervention. Le pont crée ensuite une tâche `pending_approval` dans l’interface. L’utilisateur examine le diff, les scores et les références, puis utilise **Approve** ou **Dismiss**; seul **Approve** autorise la promotion et sa trace est écrite sous `00_systeme/optimisation/approval-bridge/promotions/`. En cas d’échec de worker, contrôler aussi que le remédiateur crée seulement une leçon ou demande de capacité `pending_approval`, ne relance pas la tâche et n’écrit aucune modification de MCP, outil, modèle, Docker, permission ou configuration. Avant d’utiliser une superficie dans un PSE ou un rapport officiel, fournir ou tracer les emprises validées P1/P2/P3 et conserver la méthode SIG, le système de coordonnées et les sources.
+Avant d’activer le pipeline, copier sa politique de référence, la faire approuver, puis conserver `reference_mining_policy.approved.json` dans `00_systeme/optimisation/reference-miner/`; définir `autonomous_mining=true` et `autonomous_pipeline=true`, mais conserver impérativement `auto_promote=false`. Marquer une tâche source comme admissible seulement après sa clôture et son approbation, avec `completed=true`, `learning_eligible=true`, références de source et critères `reference_expected`; ajouter `agent_id` et `baseline_instruction` pour DSPy, ou `skill_id` pour SkillOpt. Le pipeline prépare, évalue et dépose alors les propositions sans autre intervention. Le pont crée ensuite une tâche `pending_approval` dans l’interface. L’utilisateur examine le diff, les scores et les références, puis utilise **Approve** ou **Dismiss**; seul **Approve** autorise la promotion et sa trace est écrite sous `00_systeme/optimisation/approval-bridge/promotions/`. En cas d’échec de worker, contrôler aussi que le remédiateur crée seulement une leçon ou demande de capacité `pending_approval`, ne relance pas la tâche et n’écrit aucune modification de MCP, outil, modèle, Docker, permission ou configuration. Pour un script Python, vérifier son README, sa compilation et son essai avant usage; pour une compétence externe, vérifier que l’autorisation UI limite la source et le profil, puis que l’agent l’installe avec `install_skill` dans son workspace seulement. Avant d’utiliser une superficie dans un PSE ou un rapport officiel, fournir ou tracer les emprises validées P1/P2/P3 et conserver la méthode SIG, le système de coordonnées et les sources.
 
 ## Références de conformité
 

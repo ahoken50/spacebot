@@ -97,8 +97,27 @@ function summarizeFailureRemediation(proposal) {
     `La candidate ne modifie ni MCP, ni outils, ni modèles, ni Docker, ni permissions; elle documente une conduite à tenir pour éviter une répétition identique.`,
   ].join(' ');
 }
+function summarizeCapabilitySkill(proposal) {
+  return [
+    `Demande de compétence externe ${proposal.proposal_id} pour ${proposal.target_agent_id}.`,
+    `Source proposée : ${proposal.skill_source}.`,
+    `L’approbation autorise uniquement l’agent ciblé à utiliser install_skill dans son workspace; elle n’autorise ni MCP, ni dépendance système, ni secret, ni permission ou changement Docker.`,
+  ].join(' ');
+}
+function proposalRequiresReview(proposal) {
+  return proposal?.proposal_id && !['approved_promoted', 'approved_for_agent_install', 'rejected_by_user', 'installed_after_approval'].includes(proposal.status);
+}
 function taskDescription(kind, proposal, proposalPath, proposalDir) {
-  const summary = kind === 'dspy' ? summarizeDspy(proposal) : kind === 'skillopt' ? summarizeSkillOpt(proposal) : summarizeFailureRemediation(proposal);
+  const summary = kind === 'dspy'
+    ? summarizeDspy(proposal)
+    : kind === 'skillopt'
+      ? summarizeSkillOpt(proposal)
+      : kind === 'failure_remediation'
+        ? summarizeFailureRemediation(proposal)
+        : summarizeCapabilitySkill(proposal);
+  const decisionText = kind === 'capability_skill_acquisition'
+    ? '**Approuver** autorise uniquement l’agent ciblé à installer cette compétence avec l’outil natif `install_skill` dans son workspace, après une dernière vérification. Le pont n’installe aucun code et ne change aucune capacité système. **Dismiss/Rejeter** replace la tâche dans le backlog et conserve les artefacts sans installation.'
+    : '**Approuver** dans l’interface applique uniquement cette candidate contrôlée et consigne un audit local. **Dismiss/Rejeter** replace la tâche dans le backlog et conserve les artefacts sans les appliquer.';
   return [
     '## Approbation finale requise',
     '',
@@ -108,7 +127,7 @@ function taskDescription(kind, proposal, proposalPath, proposalDir) {
     `- Artefacts de revue : \`${proposalDir}\``,
     `- Statut de promotion : **bloqué jusqu’à votre approbation**`,
     '',
-    '**Approuver** dans l’interface applique uniquement cette candidate contrôlée et consigne un audit local. **Dismiss/Rejeter** replace la tâche dans le backlog et conserve les artefacts sans les appliquer.',
+    decisionText,
   ].join('\n');
 }
 
@@ -116,12 +135,13 @@ async function discoverProposals() {
   const dspyDirectory = path.join(optimizationRoot, 'propositions');
   const skilloptDirectory = path.join(optimizationRoot, 'skillopt', 'propositions');
   const failureDirectory = path.join(optimizationRoot, 'failure-remediator', 'proposals');
+  const capabilityDirectory = path.join(workspace, '00_systeme', 'propositions_capacites');
   const proposals = [];
   for (const filename of await fs.readdir(dspyDirectory).catch(() => [])) {
     if (!filename.endsWith('.json')) continue;
     const proposalPath = path.join(dspyDirectory, filename);
     const proposal = await readJson(proposalPath);
-    if (proposal?.proposal_id && proposal.status !== 'approved_promoted' && proposal.status !== 'rejected_by_user') {
+    if (proposalRequiresReview(proposal)) {
       proposals.push({ kind: 'dspy', proposalPath, proposalDir: dspyDirectory, proposal });
     }
   }
@@ -129,7 +149,7 @@ async function discoverProposals() {
     const proposalDir = path.join(skilloptDirectory, directory);
     const proposalPath = path.join(proposalDir, 'proposal.json');
     const proposal = await readJson(proposalPath);
-    if (proposal?.proposal_id && proposal.status !== 'approved_promoted' && proposal.status !== 'rejected_by_user') {
+    if (proposalRequiresReview(proposal)) {
       proposals.push({ kind: 'skillopt', proposalPath, proposalDir, proposal });
     }
   }
@@ -137,8 +157,16 @@ async function discoverProposals() {
     const proposalDir = path.join(failureDirectory, directory);
     const proposalPath = path.join(proposalDir, 'proposal.json');
     const proposal = await readJson(proposalPath);
-    if (proposal?.proposal_id && proposal.kind === 'failure_remediation' && proposal.status !== 'approved_promoted' && proposal.status !== 'rejected_by_user') {
+    if (proposal?.kind === 'failure_remediation' && proposalRequiresReview(proposal)) {
       proposals.push({ kind: 'failure_remediation', proposalPath, proposalDir, proposal });
+    }
+  }
+  for (const filename of await fs.readdir(capabilityDirectory).catch(() => [])) {
+    if (!filename.endsWith('.json')) continue;
+    const proposalPath = path.join(capabilityDirectory, filename);
+    const proposal = await readJson(proposalPath);
+    if (proposal?.kind === 'capability_skill_acquisition' && proposalRequiresReview(proposal)) {
+      proposals.push({ kind: 'capability_skill_acquisition', proposalPath, proposalDir: capabilityDirectory, proposal });
     }
   }
   return proposals.sort((left, right) => String(left.proposal.created_at).localeCompare(String(right.proposal.created_at)));
@@ -146,7 +174,7 @@ async function discoverProposals() {
 
 async function createApprovalTask(record) {
   const { kind, proposal, proposalPath, proposalDir } = record;
-  const label = kind === 'dspy' ? 'DSPy' : kind === 'skillopt' ? 'SkillOpt' : 'Leçon après échec';
+  const label = kind === 'dspy' ? 'DSPy' : kind === 'skillopt' ? 'SkillOpt' : kind === 'failure_remediation' ? 'Leçon après échec' : 'Compétence externe';
   const title = `${label} — approbation finale : ${proposal.proposal_id}`;
   const metadata = {
     oasis_approval: {
@@ -240,6 +268,9 @@ async function promoteSkillOpt(record) {
 function stripFrontmatter(candidate) {
   return candidate.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '').trim();
 }
+function validSkillSource(value) {
+  return /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9][A-Za-z0-9_.-]*)?$/.test(String(value ?? ''));
+}
 async function promoteFailureRemediation(record, task) {
   const { proposal, proposalDir } = record;
   const targetAgent = String(proposal.target_agent_id ?? '');
@@ -273,6 +304,33 @@ async function promoteFailureRemediation(record, task) {
   return { ...result, candidate_path: candidatePath, source_task_number: proposal.source_task_number };
 }
 
+async function authorizeCapabilitySkill(record, task) {
+  const { proposal } = record;
+  const targetAgent = String(proposal.target_agent_id ?? '');
+  const source = String(proposal.skill_source ?? '');
+  if (!failureTargets.has(targetAgent)) throw new Error('Agent cible de compétence externe invalide ou non autorisé.');
+  if (!validSkillSource(source)) throw new Error('Source de compétence externe invalide; utiliser owner/repo ou owner/repo/skill-name.');
+  const constraints = proposal.constraints ?? {};
+  for (const field of ['mcp_change', 'model_change', 'docker_change', 'permissions_change', 'secret_change', 'system_dependency_change']) {
+    if (constraints[field] !== false) throw new Error(`Contrôle de sécurité invalide pour la compétence externe : ${field}.`);
+  }
+  if (constraints.workspace_skill_only !== true) throw new Error('La compétence externe doit rester limitée au workspace de l’agent.');
+  proposal.status = 'approved_for_agent_install';
+  proposal.promotion = 'approved_install_authorization_only';
+  proposal.approval_bridge = {
+    ...(proposal.approval_bridge ?? {}), task_number: task.task_number,
+    approved_by: task.approved_by ?? 'human', approved_at: task.approved_at ?? nowIso(), authorized_at: nowIso(),
+    target_agent_id: targetAgent, skill_source: source,
+  };
+  await writeJson(record.proposalPath, proposal);
+  await writePromotionAudit(proposal.proposal_id, {
+    proposal_id: proposal.proposal_id, kind: record.kind, task_number: task.task_number,
+    approved_by: task.approved_by ?? 'human', authorized_at: nowIso(), target_agent_id: targetAgent,
+    skill_source: source, promotion: 'approved_install_authorization_only',
+  });
+  return { target_agent_id: targetAgent, skill_source: source, authorization: 'agent_must_call_install_skill_in_own_workspace' };
+}
+
 async function updateTask(taskNumber, expectedRevision, status, summary) {
   return apiRequest(`/tasks/${taskNumber}`, {
     method: 'PUT',
@@ -299,6 +357,11 @@ async function finishTask(task, summary) {
 }
 
 async function applyApprovedProposal(record, task) {
+  if (record.kind === 'capability_skill_acquisition') {
+    const result = await authorizeCapabilitySkill(record, task);
+    await finishTask(task, `Compétence ${result.skill_source} autorisée pour installation contrôlée par ${result.target_agent_id}.`);
+    return result;
+  }
   const result = record.kind === 'dspy'
     ? await promoteDspy(record, task)
     : record.kind === 'skillopt'

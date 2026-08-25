@@ -83,6 +83,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-0 \
     curl \
     gh \
+    python3 \
+    python3-venv \
+    python3-pip \
     bubblewrap \
     openssh-server \
     # Chrome runtime dependencies — required whether Chrome is system-installed
