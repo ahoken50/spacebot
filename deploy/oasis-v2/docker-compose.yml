@@ -127,6 +127,51 @@ services:
     networks:
       - oasis_internal
 
+  oasis-skillopt:
+    build:
+      context: ./skillopt
+    image: oasis-skillopt:local
+    container_name: oasis-skillopt
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "3014"
+      OASIS_WORKSPACE: /workspace
+      OASIS_SKILLOPT_SKILL_CATALOG: /skill-catalog
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+      # SkillOpt apprend des compétences approbées dans des cas dépersonnalisés. Les changements restent pending_approval.
+      OASIS_SKILLOPT_ENABLED: ${OASIS_SKILLOPT_ENABLED:-true}
+      OASIS_SKILLOPT_AUTONOMOUS_ENABLED: ${OASIS_SKILLOPT_AUTONOMOUS_ENABLED:-true}
+      OASIS_SKILLOPT_INTERVAL_HOURS: ${OASIS_SKILLOPT_INTERVAL_HOURS:-24}
+      OASIS_SKILLOPT_MAX_TRAIN_CASES: ${OASIS_SKILLOPT_MAX_TRAIN_CASES:-2}
+      OASIS_SKILLOPT_MAX_VALIDATION_CASES: ${OASIS_SKILLOPT_MAX_VALIDATION_CASES:-2}
+      OASIS_SKILLOPT_MAX_HOLDOUT_CASES: ${OASIS_SKILLOPT_MAX_HOLDOUT_CASES:-2}
+      OASIS_SKILLOPT_MAX_EPOCHS: ${OASIS_SKILLOPT_MAX_EPOCHS:-1}
+      OASIS_SKILLOPT_MAX_STEPS: ${OASIS_SKILLOPT_MAX_STEPS:-1}
+      OASIS_SKILLOPT_MAX_COMPLETION_TOKENS: ${OASIS_SKILLOPT_MAX_COMPLETION_TOKENS:-650}
+      OASIS_SKILLOPT_MAX_RUNS_PER_DAY: ${OASIS_SKILLOPT_MAX_RUNS_PER_DAY:-1}
+      OASIS_SKILLOPT_TIMEOUT_SECONDS: ${OASIS_SKILLOPT_TIMEOUT_SECONDS:-600}
+      OASIS_SKILLOPT_OPTIMIZER_MODEL: ${OASIS_SKILLOPT_OPTIMIZER_MODEL:-qwen/qwen3.7-flash}
+      OASIS_SKILLOPT_TARGET_MODEL: ${OASIS_SKILLOPT_TARGET_MODEL:-qwen/qwen3.7-flash}
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+      - ./profile-skills:/skill-catalog:ro
+    expose:
+      - "3014"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3014/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    networks:
+      - oasis_internal
+
   spacebot-oasis-v2:
     image: spacebot-oasis-v2:local
     build:
@@ -158,6 +203,8 @@ services:
       oasis-document-studio:
         condition: service_healthy
       oasis-optimizer:
+        condition: service_healthy
+      oasis-skillopt:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true

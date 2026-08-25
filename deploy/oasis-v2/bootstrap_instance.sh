@@ -13,6 +13,8 @@ fi
 mkdir -p "${INSTANCE_DIR}/agents" \
   "${SHARED_WORKSPACE}/00_systeme/propositions_capacites" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/propositions" \
+  "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/propositions" \
+  "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/runs" \
   "${SHARED_WORKSPACE}/01_sources/00_inbox" \
   "${SHARED_WORKSPACE}/01_sources/01_convention" \
   "${SHARED_WORKSPACE}/01_sources/02_budget_depenses" \
@@ -66,6 +68,7 @@ cp -R "${ROOT_DIR}/skills" "${INSTANCE_DIR}/skills"
 # Installer la taxonomie et les livrables de référence, sans écraser une version locale modifiée.
 cp --update=none "${ROOT_DIR}/document-studio/taxonomy.json" "${SHARED_WORKSPACE}/00_systeme/taxonomie_documentaire.json"
 cp --update=none "${ROOT_DIR}/optimizer/fixtures/reference_cases.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/reference_cases.template.json"
+cp --update=none "${ROOT_DIR}/skillopt/fixtures/skillopt_reference_pack.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/skillopt_reference_pack.template.json"
 cp --update=none "${ROOT_DIR}/templates/"* "${SHARED_WORKSPACE}/07_livrables/00_reference/"
 
 write_profile() {
@@ -118,7 +121,7 @@ write_profile \
   "Coordonnateur OASIS-V2" \
   "Recevoir les demandes depuis l’interface Web, clarifier l’objectif, créer un plan de travail, déléguer aux profils appropriés, consolider les résultats et demander les approbations requises. Maintenir la cohérence entre budget, calendrier, PSE, rapports et comité." \
   "Rester orienté vers le résultat fini, vérifiable et utile à la Ville. Préserver la traçabilité de toute décision, ne pas court-circuiter l’expertise des profils spécialisés, et résumer les arbitrages à l’administration." \
-  "oasis-coordination oasis-financial-control oasis-schedule-governance oasis-pse-sig oasis-reporting oasis-document-studio oasis-supervised-optimization"
+  "oasis-coordination oasis-financial-control oasis-schedule-governance oasis-pse-sig oasis-reporting oasis-document-studio oasis-supervised-optimization oasis-skillopt-learning"
 
 write_profile \
   "oasis-finances" \

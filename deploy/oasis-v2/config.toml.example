@@ -148,6 +148,12 @@ name = "oasis_supervised_optimizer"
 transport = "http"
 url = "http://oasis-optimizer:3013/mcp"
 
+# SkillOpt apprend uniquement des compétences ciblées sur cas approuvés; il ne promeut jamais une version seul.
+[[agents.mcp]]
+name = "oasis_skillopt"
+transport = "http"
+url = "http://oasis-skillopt:3014/mcp"
+
 [[agents]]
 id = "oasis-finances"
 display_name = "Analyste financier OASIS-V2"

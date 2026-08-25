@@ -57,7 +57,7 @@ assert 'ENV PATH="/root/.bun/bin:${PATH}"' in root_dockerfile, 'Le chemin runtim
 mcp = {entry['name']: entry['url'] for entry in config['defaults']['mcp']}
 assert mcp == {'oasis_shared_memory': 'http://oasis-shared-memory:3010/mcp'}, 'La mémoire commune doit être l’unique MCP partagé par défaut.'
 expected_agent_mcp = {
-    'oasis-coordination': {'oasis_document_studio', 'oasis_supervised_optimizer'},
+    'oasis-coordination': {'oasis_document_studio', 'oasis_supervised_optimizer', 'oasis_skillopt'},
     'oasis-finances': {'oasis_document_studio'},
     'oasis-calendrier': {'oasis_document_studio'},
     'oasis-pse-sig': {'oasis_gis_local', 'oasis_document_studio'},
@@ -69,12 +69,24 @@ for agent in agents:
     assert tool_names == expected_agent_mcp[agent['id']], f'MCP ciblés incorrects pour {agent["id"]}: {tool_names}'
 coordination = next(agent for agent in agents if agent['id'] == 'oasis-coordination')
 assert coordination['browser']['enabled'] is True
-for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'spacebot-oasis-v2:'):
+for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'spacebot-oasis-v2:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
 optimizer_server = (ROOT / 'optimizer' / 'server.js').read_text(encoding='utf-8')
 assert "process.env.OASIS_OPTIMIZER_ENABLED ?? 'true'" in optimizer_server, 'Le serveur DSPy doit être actif par défaut.'
 assert "confirm_approved_reference_pack: z.literal(true)" in optimizer_server, 'Une confirmation de jeu approuvé doit rester obligatoire.'
+assert 'OASIS_SKILLOPT_ENABLED: ${OASIS_SKILLOPT_ENABLED:-true}' in compose, 'SkillOpt doit être actif par défaut.'
+assert 'OASIS_SKILLOPT_AUTONOMOUS_ENABLED: ${OASIS_SKILLOPT_AUTONOMOUS_ENABLED:-true}' in compose, 'Le cycle SkillOpt autonome doit être configurable et actif par défaut.'
+skillopt_server = (ROOT / 'skillopt' / 'server.js').read_text(encoding='utf-8')
+skillopt_runner = (ROOT / 'skillopt' / 'skillopt_runner.py').read_text(encoding='utf-8')
+assert "OASIS_SKILLOPT_ENABLED ?? 'true'" in skillopt_server, 'Le serveur SkillOpt doit être actif par défaut.'
+assert "runSkillOpt(['autonomous'])" in skillopt_server, 'Le serveur SkillOpt doit prévoir un cycle autonome borné.'
+assert 'status") != "approved"' in skillopt_runner and 'redacted") is not True' in skillopt_runner, 'SkillOpt doit exiger un pack approuvé et dépersonnalisé.'
+assert '"promotion": "blocked_pending_human_approval"' in skillopt_runner, 'SkillOpt ne doit jamais promouvoir une compétence directement.'
+assert 'ALLOWED_SKILLS' in skillopt_runner, 'SkillOpt doit restreindre les compétences auto-évolutives.'
+skillopt_dockerfile = (ROOT / 'skillopt' / 'Dockerfile').read_text(encoding='utf-8')
+assert 'SKILLOPT_COMMIT=0389ace56339988e16ca5ddab36f0978776fe9b0' in skillopt_dockerfile, 'La révision SkillOpt doit être figée.'
+assert 'git rev-parse HEAD' in skillopt_dockerfile, 'La révision SkillOpt doit être vérifiée pendant la construction.'
 
 for link in config['links']:
     assert link['from'] in agent_ids | human_ids and link['to'] in agent_ids | human_ids, f'Lien invalide : {link}'
@@ -95,6 +107,10 @@ for required in [
     ROOT / 'optimizer' / 'server.js',
     ROOT / 'optimizer' / 'optimizer.py',
     ROOT / 'optimizer' / 'fixtures' / 'reference_cases.template.json',
+    ROOT / 'skillopt' / 'Dockerfile',
+    ROOT / 'skillopt' / 'server.js',
+    ROOT / 'skillopt' / 'skillopt_runner.py',
+    ROOT / 'skillopt' / 'fixtures' / 'skillopt_reference_pack.template.json',
     ROOT / 'skills' / 'oasis-foundation' / 'SKILL.md',
     ROOT / 'skills' / 'oasis-capability-discovery' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md',
@@ -105,8 +121,9 @@ for required in [
     ROOT / 'profile-skills' / 'oasis-governance' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-document-studio' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-supervised-optimization' / 'SKILL.md',
+    ROOT / 'profile-skills' / 'oasis-skillopt-learning' / 'SKILL.md',
 ]:
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: suggest | Taxonomie: 8 catégories | DSPy: actif et supervisé | Sobriété: activée')
+print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: suggest | Taxonomie: 8 catégories | DSPy: actif et supervisé | SkillOpt: autonome borné et à promotion bloquée | Sobriété: activée')

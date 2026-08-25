@@ -11,6 +11,8 @@ Cette configuration prépare une instance Spacebot destinée au suivi de la conv
 | `oasis-shared-memory` | Serveur MCP interne : écritures contrôlées, recherche sémantique, lecture de dossiers et liens de traçabilité. | Sans état; s’appuie sur PostgreSQL |
 | `oasis-gis` | Serveur MCP SIG local : inventaire KML, export GeoJSON et intersections par emprise P1/P2/P3. | `instance/shared-workspace/` |
 | `oasis-document-studio` | Serveur MCP documentaire local : DOCX/PDF, aperçu PNG et contrôle qualité. | `instance/shared-workspace/` |
+| `oasis-optimizer` | Boucle DSPy : évalue et propose des améliorations d’instructions courtes sur cas approuvés. | `instance/shared-workspace/00_systeme/optimisation/` |
+| `oasis-skillopt` | Boucle SkillOpt : apprend de façon périodique une procédure `SKILL.md` autorisée, sur partitions de test séparées. | `instance/shared-workspace/00_systeme/optimisation/skillopt/` |
 | OpenRouter | Routage des modèles de génération et création d’embeddings; les vecteurs générés sont mis en cache dans PostgreSQL. | Compte OpenRouter de la Ville |
 
 ## Profils et circulation du travail
@@ -110,7 +112,7 @@ Le service `oasis-document-studio` donne aux agents les outils `get_document_tax
 
 ## Compétences préchargées par profil
 
-Chaque agent charge systématiquement la compétence commune `oasis-foundation`, qui impose la traçabilité, le classement, la mémoire partagée, l’approbation humaine et la sobriété des échanges. Les autres compétences sont copiées dans le workspace du profil lors de l’initialisation : le coordonnateur reçoit la coordination, les procédures financières, calendaires, PSE, de reddition, documentaires et d’optimisation supervisée; l’analyste financier reçoit finance, reddition et documents; le planificateur reçoit calendrier, reddition et documents; l’analyste PSE/SIG reçoit SIG et documents; le rédacteur reçoit reddition, documents, finances et PSE; et le secrétaire reçoit gouvernance, calendrier et documents.
+Chaque agent charge systématiquement la compétence commune `oasis-foundation`, qui impose la traçabilité, le classement, la mémoire partagée, l’approbation humaine et la sobriété des échanges. Les autres compétences sont copiées dans le workspace du profil lors de l’initialisation : le coordonnateur reçoit la coordination, les procédures financières, calendaires, PSE, de reddition, documentaires, l’optimisation DSPy et l’apprentissage SkillOpt; l’analyste financier reçoit finance, reddition et documents; le planificateur reçoit calendrier, reddition et documents; l’analyste PSE/SIG reçoit SIG et documents; le rédacteur reçoit reddition, documents, finances et PSE; et le secrétaire reçoit gouvernance, calendrier et documents.
 
 Cette répartition évite de charger à tous les agents des instructions inutiles tout en laissant les procédures communes disponibles. Les compétences sont uniquement des directives opératoires; les données factuelles demeurent dans le registre commun et les dossiers classés.
 
@@ -121,6 +123,18 @@ Le coordonnateur dispose seul du service `oasis-supervised-optimizer` et de la c
 Le conteneur et l’outil DSPy sont **actifs par défaut** au démarrage de la pile (`OASIS_OPTIMIZER_ENABLED=true`). Cette activation ne planifie ni n’exécute aucun appel de modèle : elle rend disponibles le statut, la validation du jeu de référence et, au coordonnateur seulement, l’action manuelle de proposition. Pour effectuer une optimisation, copier `00_systeme/optimisation/reference_cases.template.json` en `reference_cases.approved.json`, remplacer les exemples fictifs par un ou deux cas représentatifs puis obtenir l’approbation humaine en inscrivant le statut `approved`, le réviseur et la date. Le coordonnateur valide ensuite le jeu de référence et lance explicitement une proposition avec un seul candidat. Les métriques déterministes évaluent les termes essentiels, les assertions interdites, les marqueurs de source et la concision. Les propositions sont écrites sous `00_systeme/optimisation/propositions/` avec le statut `pending_approval`. Pour désactiver l’action de proposition tout en gardant le service de statut et de validation, définir `OASIS_OPTIMIZER_ENABLED=false` dans `.env` puis redémarrer la pile.
 
 Les limites par défaut sont de deux cas, un candidat et huit appels de modèle. L’optimiseur ne peut ni modifier `config.toml`, ni changer un modèle, une compétence, un outil, une dépendance ou une permission. Une amélioration ne devient active qu’après une revue humaine et un changement versionné distinct. Cette séparation permet de bénéficier d’un processus de type DSPy tout en évitant l’auto-modification libre et les coûts incontrôlés.
+
+## Apprentissage autonome de compétences avec SkillOpt
+
+Le coordonnateur dispose également seul du service `oasis-skillopt`. **DSPy** améliore une instruction ou un comportement court; **SkillOpt** apprend une seule procédure `SKILL.md` autorisée à la fois. SkillOpt utilise une révision figée du projet Microsoft, un backend OpenAI-compatible relié à OpenRouter et un adaptateur OASIS qui calcule localement les scores de termes requis/interdits, preuve de source et concision. Aucun entraînement de poids ni GPU ne sont nécessaires. [9] [10]
+
+Le service est actif au démarrage et vérifie son cycle 30 secondes après le lancement, puis toutes les 24 heures par défaut. Cette vérification n’entraîne aucun appel de modèle tant que `00_systeme/optimisation/skillopt/skillopt_reference_pack.approved.json` n’existe pas, ne porte pas `status: approved`, `redacted: true`, `scope: skill_text_only` et `autonomous_learning: true`, ou qu’il dépasse le plafond d’une exécution par jour. Le pack sépare obligatoirement les cas `training_cases`, `validation_cases` et `holdout_cases`, avec des identifiants sans recoupement. Les exemples doivent être synthétiques ou dépersonnalisés et ne doivent jamais contenir de pièce municipale réelle.
+
+La cible est limitée aux compétences spécialisées de coordination, finances, calendrier, PSE/SIG, reddition, gouvernance et production documentaire. Une tentative s’exécute sur une seule compétence, deux cas d’apprentissage, deux de validation et deux de contrôle final, pour une époque et une étape au plus; les deux rôles de modèle sont `qwen/qwen3.7-flash` par défaut et les sorties sont limitées à 650 jetons. Les valeurs peuvent être réduites dans `.env`. Les tests, journaux, compétence de base, candidate et synthèse de score restent dans `00_systeme/optimisation/skillopt/`.
+
+> L’autonomie porte sur l’expérimentation, l’évaluation et la création d’une proposition. Elle ne porte jamais sur l’adoption en production. Chaque candidate reçoit le statut `pending_approval` et doit être examinée à partir du diff et du contrôle holdout, puis promue uniquement par un commit distinct et les contrôles statiques OASIS.
+
+Pour l’activer après un premier essai, copier `skillopt_reference_pack.template.json` en `skillopt_reference_pack.approved.json`, adapter les six cas de référence, faire approuver le pack et régler `autonomous_learning` à `true`. Pour mettre la boucle en pause, définir `OASIS_SKILLOPT_AUTONOMOUS_ENABLED=false`; pour désactiver complètement les outils SkillOpt, définir `OASIS_SKILLOPT_ENABLED=false`, puis relancer la pile. Les contrôles `skillopt_status`, `skillopt_validate_reference_pack`, `skillopt_learn` et `skillopt_autonomous_cycle` restent accessibles au coordonnateur seulement.
 
 ## Découverte et évolution contrôlée des capacités
 
@@ -160,3 +174,7 @@ tar -czf oasis-v2-spacebot-$(date +%F).tar.gz instance volumes
 [7] [DSPy — Optimisation d’instructions avec GEPA](https://dspy.ai/getting-started/gepa-optimization/)
 
 [8] [Spacebot — Compétences : chargement, installation et rechargement à chaud](../../docs/content/docs/(features)/skills.mdx)
+
+[9] [Microsoft SkillOpt — dépôt officiel](https://github.com/microsoft/skillopt)
+
+[10] [SkillOpt — guide d’ajout d’un benchmark et de validation](https://github.com/microsoft/skillopt/blob/main/docs/guide/new-benchmark.md)
