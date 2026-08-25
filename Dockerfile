@@ -16,6 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"
 
+# OpenCode est requis uniquement lorsque [defaults.opencode] est activé.
+# L’installation via le paquet officiel évite une récupération au démarrage de l’instance.
+ARG OPENCODE_VERSION=1.18.21
+RUN bun install -g opencode-ai@${OPENCODE_VERSION}
+
 # Node 22+ is required for the OpenCode embed Vite build.
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
@@ -102,6 +107,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/spacebot /usr/local/bin/spacebot
+# OpenCode est installé avec Bun dans l’étape builder; copier Bun et le paquet global
+# rend le chemin /root/.bun/bin/opencode configuré pour OASIS réellement disponible au runtime.
+COPY --from=builder /root/.bun /root/.bun
+ENV PATH="/root/.bun/bin:${PATH}"
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

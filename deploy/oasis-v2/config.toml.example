@@ -6,10 +6,13 @@
 openrouter_key = "env:OPENROUTER_API_KEY"
 
 [defaults]
-max_concurrent_branches = 2
-max_turns = 4
-context_window = 128000
-history_backfill_count = 40
+# Sobriété : limiter les fan-outs et le contexte brut, sans sacrifier les livrables complexes.
+max_concurrent_branches = 1
+max_concurrent_workers = 1
+max_turns = 3
+branch_max_turns = 6
+context_window = 96000
+history_backfill_count = 12
 worker_log_mode = "errors_only"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
@@ -27,6 +30,7 @@ document_vision = "openrouter/google/gemini-2.5-flash-lite"
 deep_reasoning = "openrouter/openai/gpt-oss-120b"
 structured_extraction = "openrouter/qwen/qwen3.7-flash"
 data_processing = "openrouter/qwen/qwen3.7-flash"
+coding = "openrouter/openai/gpt-oss-120b"
 
 [defaults.routing.fallbacks]
 "openrouter/deepseek/deepseek-v4-flash" = ["openrouter/openai/gpt-oss-120b", "openrouter/google/gemini-2.5-flash-lite"]
@@ -35,42 +39,69 @@ data_processing = "openrouter/qwen/qwen3.7-flash"
 "openrouter/mistralai/mistral-nemo" = ["openrouter/qwen/qwen3.7-flash"]
 "openrouter/google/gemini-2.5-flash-lite" = ["openrouter/deepseek/deepseek-v4-flash"]
 
+# OpenCode est réservé aux tâches de développement multi-fichiers. Les agents builtin
+# restent utilisés pour l’analyse documentaire, SIG, commandes ponctuelles et écritures courtes.
+[defaults.opencode]
+enabled = true
+path = "/root/.bun/bin/opencode"
+max_servers = 1
+server_startup_timeout_secs = 45
+max_restart_retries = 2
+
+[defaults.opencode.permissions]
+edit = "allow"
+bash = "allow"
+webfetch = "deny"
+
+# Chronicle évite de renvoyer des transcriptions longues; le budget injecté est volontairement borné.
 [defaults.compaction]
 mode = "chronicle"
-background_threshold = 0.80
-aggressive_threshold = 0.88
-emergency_threshold = 0.95
+background_threshold = 0.72
+aggressive_threshold = 0.82
+emergency_threshold = 0.93
 
 [defaults.compaction.chronicle]
-interval_messages = 32
-interval_token_fraction = 0.12
-recent_window_hours = 72
-max_recent = 10
-max_older = 16
-context_token_budget = 2200
-expand_message_limit = 100
-max_messages_per_checkpoint = 400
-rollup_threshold = 12
-rollup_batch = 8
+interval_messages = 24
+interval_token_fraction = 0.08
+recent_window_hours = 24
+max_recent = 4
+max_older = 6
+context_token_budget = 1200
+expand_message_limit = 25
+max_messages_per_checkpoint = 120
+rollup_threshold = 8
+rollup_batch = 4
+
+# Éviter des branches silencieuses de mémoire/réflexion; la mémoire SQL commune est alimentée
+# explicitement seulement par des faits, décisions et livrables vérifiables.
+[defaults.memory_persistence]
+enabled = false
+message_interval = 100
+
+[defaults.skills.reflection]
+enabled = false
+min_tool_iterations = 20
+cooldown_secs = 14400
 
 [defaults.cortex]
-tick_interval_secs = 300
-worker_wall_clock_timeout_secs = 900
+tick_interval_secs = 900
+worker_wall_clock_timeout_secs = 600
 circuit_breaker_threshold = 3
 
 # Une action contractuelle, financière ou une transmission au Ministère nécessite une approbation humaine.
 [defaults.autonomy]
 level = "suggest"
-interval_secs = 7200
-max_turns = 12
-max_tasks_per_run = 2
-timeout_secs = 900
-warn_secs = 720
-run_history_count = 5
+interval_secs = 14400
+max_turns = 4
+max_tasks_per_run = 1
+timeout_secs = 600
+warn_secs = 480
+run_history_count = 3
 claim_unowned = false
 
+# Le navigateur ajoute beaucoup d’outils et de contexte : il est réservé au coordonnateur.
 [defaults.browser]
-enabled = true
+enabled = false
 headless = true
 evaluate_enabled = false
 persist_session = false
@@ -99,6 +130,24 @@ workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
+[agents.browser]
+enabled = true
+headless = true
+evaluate_enabled = false
+persist_session = false
+close_policy = "close_tabs"
+
+[[agents.mcp]]
+name = "oasis_document_studio"
+transport = "http"
+url = "http://oasis-document-studio:3012/mcp"
+
+# L’optimisation est centralisée : elle ne peut produire que des propositions à approuver.
+[[agents.mcp]]
+name = "oasis_supervised_optimizer"
+transport = "http"
+url = "http://oasis-optimizer:3013/mcp"
+
 [[agents]]
 id = "oasis-finances"
 display_name = "Analyste financier OASIS-V2"
@@ -106,6 +155,11 @@ role = "Suivi du budget, dépenses, salaires, contrats, appels d’offres, admis
 workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[[agents.mcp]]
+name = "oasis_document_studio"
+transport = "http"
+url = "http://oasis-document-studio:3012/mcp"
 
 [[agents]]
 id = "oasis-calendrier"
@@ -115,6 +169,11 @@ workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
+[[agents.mcp]]
+name = "oasis_document_studio"
+transport = "http"
+url = "http://oasis-document-studio:3012/mcp"
+
 [[agents]]
 id = "oasis-pse-sig"
 display_name = "Analyste PSE et SIG OASIS-V2"
@@ -122,6 +181,16 @@ role = "Plan de suivi et d’évaluation, KML, superficies, indicateurs, vulnér
 workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[[agents.mcp]]
+name = "oasis_gis_local"
+transport = "http"
+url = "http://oasis-gis:3011/mcp"
+
+[[agents.mcp]]
+name = "oasis_document_studio"
+transport = "http"
+url = "http://oasis-document-studio:3012/mcp"
 
 [[agents]]
 id = "oasis-reddition"
@@ -131,6 +200,11 @@ workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
+[[agents.mcp]]
+name = "oasis_document_studio"
+transport = "http"
+url = "http://oasis-document-studio:3012/mcp"
+
 [[agents]]
 id = "oasis-gouvernance"
 display_name = "Secrétaire du comité de suivi OASIS-V2"
@@ -138,6 +212,11 @@ role = "Comité de suivi, convocations, ordres du jour, procès-verbaux, décisi
 workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[[agents.mcp]]
+name = "oasis_document_studio"
+transport = "http"
+url = "http://oasis-document-studio:3012/mcp"
 
 # Organisation : l’administration pilote le coordonnateur, qui délègue les analyses spécialisées.
 [[links]]

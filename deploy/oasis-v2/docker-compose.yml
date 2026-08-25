@@ -48,6 +48,82 @@ services:
     networks:
       - oasis_internal
 
+  oasis-gis:
+    build:
+      context: ./gis-mcp
+    image: oasis-gis-mcp:local
+    container_name: oasis-gis
+    restart: unless-stopped
+    environment:
+      PORT: "3011"
+      OASIS_GIS_WORKSPACE: /workspace
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    expose:
+      - "3011"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3011/health').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - oasis_internal
+
+  oasis-document-studio:
+    build:
+      context: ./document-studio
+    image: oasis-document-studio:local
+    container_name: oasis-document-studio
+    restart: unless-stopped
+    environment:
+      PORT: "3012"
+      OASIS_DOCUMENT_WORKSPACE: /workspace
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    expose:
+      - "3012"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3012/health').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - oasis_internal
+
+  oasis-optimizer:
+    build:
+      context: ./optimizer
+    image: oasis-supervised-optimizer:local
+    container_name: oasis-optimizer
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "3013"
+      OASIS_WORKSPACE: /workspace
+      OASIS_OPTIMIZER_MODEL: ${OASIS_OPTIMIZER_MODEL:-openrouter/qwen/qwen3.7-flash}
+      OASIS_OPTIMIZER_MAX_CASES: ${OASIS_OPTIMIZER_MAX_CASES:-2}
+      OASIS_OPTIMIZER_MAX_CANDIDATES: ${OASIS_OPTIMIZER_MAX_CANDIDATES:-1}
+      OASIS_OPTIMIZER_MAX_CALLS: ${OASIS_OPTIMIZER_MAX_CALLS:-8}
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    expose:
+      - "3013"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3013/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - oasis_internal
+
   spacebot-oasis-v2:
     image: spacebot-oasis-v2:local
     build:
@@ -63,6 +139,8 @@ services:
       SPACEBOT_CRON_TIMEZONE: America/Toronto
       SPACEBOT_USER_TIMEZONE: America/Toronto
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+      OPENCODE_DISABLE_AUTOUPDATE: "true"
+      OPENCODE_DISABLE_LSP_DOWNLOAD: "true"
     ports:
       # Interface Web locale. Garder ce bind en localhost sauf si un proxy authentifié est ajouté.
       - "127.0.0.1:19898:19898"
@@ -71,6 +149,12 @@ services:
       - ./instance:/data
     depends_on:
       oasis-shared-memory:
+        condition: service_healthy
+      oasis-gis:
+        condition: service_healthy
+      oasis-document-studio:
+        condition: service_healthy
+      oasis-optimizer:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true

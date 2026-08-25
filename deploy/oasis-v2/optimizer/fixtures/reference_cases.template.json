@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "status": "draft",
+  "purpose": "Gabarit de cas de référence dépersonnalisés pour l’optimisation supervisée. Ne pas inclure de pièces municipales confidentielles ni de données personnelles.",
+  "approved_by": null,
+  "approved_at": null,
+  "cases": [
+    {
+      "id": "EXEMPLE-001",
+      "agent_id": "oasis-finances",
+      "task_input": "Extraire les champs requis d’une dépense fictive et signaler l’information manquante.",
+      "baseline_instruction": "Produire une réponse structurée, citer la pièce source et ne pas inventer les informations manquantes.",
+      "expected": {
+        "required_terms": ["source", "information manquante"],
+        "forbidden_terms": ["approuvé définitivement"],
+        "require_source_markers": true,
+        "max_chars": 1800
+      }
+    }
+  ]
+}

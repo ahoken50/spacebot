@@ -15,12 +15,12 @@ Les valeurs initiales documentées sont **1,41 ha** d’infrastructures vertes p
 
 ## Calculer les superficies du KML
 
-1. Importer le KML dans un SIG municipal et conserver une copie non modifiée.
-2. Reprojeter les données dans le système métrique officiel de la Ville avant toute mesure.
-3. Créer les emprises nommées `P1`, `P2` et `P3`; le KML brut ne suffit pas pour attribuer tous les objets techniques aux trois projets.
-4. Intersecter les géométries avec ces emprises, classer chaque objet et éliminer les doubles comptes ou chevauchements.
-5. Documenter les règles de classification, les formules, les captures et une contre-vérification.
-6. Inscrire les résultats dans `Calculs_SIG_PSE_OASIS_V2.xlsx` et enregistrer le jeu de résultats dans la mémoire partagée avec son statut de validation.
+1. Déposer le KML dans `sources/` puis utiliser `inspect_kml` pour dresser l’inventaire local des objets, noms, surfaces brutes et erreurs de lecture.
+2. Utiliser `export_kml_geojson` pour produire une copie GeoJSON de travail dans `livrables/sig/`; le KML et le GeoJSON restent sur la machine locale.
+3. Créer ou importer les emprises polygonales nommées `P1`, `P2` et `P3` dans un GeoJSON. Le KML brut ne suffit pas pour attribuer tous les objets techniques aux trois projets.
+4. Utiliser `project_surface_analysis` avec les emprises validées; il calcule les intersections géodésiques et produit un GeoJSON de contrôle.
+5. Dans un SIG municipal, classer les objets par type, dissoudre les surfaces d’un même type et éliminer les doublons ou chevauchements avant d’établir une valeur finale.
+6. Documenter les règles de classification, les formules, les captures et une contre-vérification. Inscrire le résultat dans `Calculs_SIG_PSE_OASIS_V2.xlsx` et dans la mémoire partagée avec son statut de validation.
 
 ## Calculer l’indicateur de vulnérabilité
 

@@ -12,6 +12,9 @@ const databaseUrl = requiredEnvironment('DATABASE_URL');
 const openRouterApiKey = requiredEnvironment('OPENROUTER_API_KEY');
 const embeddingModel = process.env.OASIS_EMBEDDING_MODEL ?? 'qwen/qwen3-embedding-0.6b';
 const embeddingDimensions = Number.parseInt(process.env.OASIS_EMBEDDING_DIMENSIONS ?? '1024', 10);
+const queryEmbeddingCache = new Map();
+const QUERY_CACHE_TTL_MS = 5 * 60 * 1000;
+const QUERY_CACHE_MAX_ENTRIES = 256;
 
 const pool = new Pool({
   connectionString: databaseUrl,
@@ -84,7 +87,7 @@ async function embed(text) {
       model: embeddingModel,
       input: text,
       provider: {
-        allow_fallbacks: true,
+        allow_fallbacks: false,
         data_collection: 'deny',
       },
     }),
@@ -98,6 +101,18 @@ async function embed(text) {
   if (!Array.isArray(vector) || vector.length !== embeddingDimensions) {
     throw new Error(`Embedding dimension mismatch: expected ${embeddingDimensions}, received ${Array.isArray(vector) ? vector.length : 'no vector'}`);
   }
+  return vector;
+}
+
+async function embedQuery(query) {
+  const normalized = query.trim().replace(/\s+/g, ' ').slice(0, 1000);
+  const cached = queryEmbeddingCache.get(normalized);
+  if (cached && Date.now() - cached.createdAt < QUERY_CACHE_TTL_MS) return cached.vector;
+  const vector = await embed(normalized);
+  if (queryEmbeddingCache.size >= QUERY_CACHE_MAX_ENTRIES) {
+    queryEmbeddingCache.delete(queryEmbeddingCache.keys().next().value);
+  }
+  queryEmbeddingCache.set(normalized, { vector, createdAt: Date.now() });
   return vector;
 }
 
@@ -131,7 +146,7 @@ function createServer() {
         record_type: z.enum(['decision', 'financial_entry', 'contract', 'procurement', 'schedule', 'indicator', 'project', 'deliverable', 'meeting', 'risk', 'document', 'fact']),
         scope: z.string().min(1).max(160).default('oasis-v2'),
         title: z.string().min(3).max(500),
-        content: z.string().min(10).max(20_000),
+        content: z.string().min(10).max(6_000),
         payload: z.record(z.string(), z.unknown()).default({}),
         source_references: z.array(z.string().min(1).max(500)).max(30).default([]),
         created_by: z.string().min(3).max(100),
@@ -139,6 +154,28 @@ function createServer() {
       },
     },
     async ({ external_key, record_type, scope, title, content, payload, source_references, created_by, status }) => {
+      // Une mise à jour identique d’une entité stable ne mérite ni nouvel embedding ni écriture d’audit.
+      if (external_key) {
+        const existing = await pool.query(
+          'SELECT id, external_key, record_type, scope, title, content, payload, source_references, created_by, status, created_at, updated_at FROM shared_records WHERE external_key = $1 LIMIT 1',
+          [external_key],
+        );
+        const record = existing.rows[0];
+        if (record
+          && record.record_type === record_type
+          && record.scope === scope
+          && record.title === title
+          && record.content === content
+          && record.created_by === created_by
+          && record.status === status
+          && JSON.stringify(record.payload) === JSON.stringify(payload)
+          && JSON.stringify(record.source_references) === JSON.stringify(source_references)) {
+          delete record.content;
+          delete record.payload;
+          delete record.source_references;
+          return textResult({ ...record, unchanged: true, note: 'Aucun embedding ni écriture créé : le contenu indexé est identique.' });
+        }
+      }
       const embedding = await embed(`${title}\n\n${content}`);
       const recordId = crypto.randomUUID();
       const result = await pool.query(
@@ -176,15 +213,15 @@ function createServer() {
     {
       description: 'Rechercher dans la mémoire commune de tous les profils OASIS par similarité sémantique et filtres. Toujours citer les source_references dans les livrables produits à partir du résultat.',
       inputSchema: {
-        query: z.string().min(3).max(5_000),
+        query: z.string().min(3).max(1_000),
         scope: z.string().max(160).optional(),
         record_type: z.string().max(80).optional(),
         status: z.string().max(80).optional(),
-        limit: z.number().int().min(1).max(20).default(8),
+        limit: z.number().int().min(1).max(10).default(5),
       },
     },
     async ({ query, scope, record_type, status, limit }) => {
-      const embedding = await embed(query);
+      const embedding = await embedQuery(query);
       const result = await pool.query(
         `
           SELECT id, external_key, record_type, scope, title, content, payload,
@@ -199,7 +236,12 @@ function createServer() {
         `,
         [vectorLiteral(embedding), scope ?? null, record_type ?? null, status ?? null, limit],
       );
-      return textResult({ query, records: normalizeRecords(result.rows) });
+      const compactRecords = normalizeRecords(result.rows).map((record) => ({
+        ...record,
+        content: record.content.length > 1200 ? `${record.content.slice(0, 1200)}…` : record.content,
+        content_truncated: record.content.length > 1200,
+      }));
+      return textResult({ query, records: compactRecords, note: 'Les extraits sont limités pour réduire le contexte. Utiliser get_shared_record avec un id ou external_key seulement lorsqu’un enregistrement est réellement requis.' });
     },
   );
 
