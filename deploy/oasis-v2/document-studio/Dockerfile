@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY package.json ./
-RUN bun install --production --frozen-lockfile=false
+RUN bun install --production
 COPY server.js ./
 COPY taxonomy.json ./taxonomy.json
 COPY templates ./templates

@@ -24,7 +24,7 @@ RUN mkdir -p /opt/skillopt/skillopt/envs/oasis \
   && rm -rf /tmp/oasis_env /tmp/register_oasis_env.py /root/.cache
 
 COPY package.json ./
-RUN bun install --frozen-lockfile=false
+RUN bun install --production
 COPY server.js ./
 COPY skillopt_runner.py ./
 COPY fixtures ./fixtures

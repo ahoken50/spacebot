@@ -2,7 +2,7 @@ FROM oven/bun:1.3.4-alpine
 
 WORKDIR /app
 COPY package.json ./
-RUN bun install --production --frozen-lockfile=false
+RUN bun install --production
 COPY server.js ./
 
 ENV PORT=3011

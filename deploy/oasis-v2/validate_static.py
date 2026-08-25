@@ -87,6 +87,18 @@ assert 'ALLOWED_SKILLS' in skillopt_runner, 'SkillOpt doit restreindre les comp�
 skillopt_dockerfile = (ROOT / 'skillopt' / 'Dockerfile').read_text(encoding='utf-8')
 assert 'SKILLOPT_COMMIT=0389ace56339988e16ca5ddab36f0978776fe9b0' in skillopt_dockerfile, 'La révision SkillOpt doit être figée.'
 assert 'git rev-parse HEAD' in skillopt_dockerfile, 'La révision SkillOpt doit être vérifiée pendant la construction.'
+for dockerfile in (
+    ROOT / 'shared-memory' / 'Dockerfile',
+    ROOT / 'gis-mcp' / 'Dockerfile',
+    ROOT / 'document-studio' / 'Dockerfile',
+    ROOT / 'optimizer' / 'Dockerfile',
+    ROOT / 'skillopt' / 'Dockerfile',
+):
+    dockerfile_text = dockerfile.read_text(encoding='utf-8')
+    assert 'frozen-lockfile=false' not in dockerfile_text, f'Argument Bun invalide dans {dockerfile}.'
+    assert 'bun install --production' in dockerfile_text, f'Installation Bun de production attendue dans {dockerfile}.'
+optimizer_dockerfile = (ROOT / 'optimizer' / 'Dockerfile').read_text(encoding='utf-8')
+assert 'FROM oven/bun:1.3.4-alpine' in optimizer_dockerfile, 'L’image DSPy doit être alignée sur Bun 1.3.4.'
 
 for link in config['links']:
     assert link['from'] in agent_ids | human_ids and link['to'] in agent_ids | human_ids, f'Lien invalide : {link}'
