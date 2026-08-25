@@ -2,7 +2,7 @@
 
 **Date de contrôle :** 25 août 2026
 
-**Portée :** configuration locale Docker, profils OASIS, modèles OpenRouter, liens, mémoire SQL‑vectorielle, MCP, OpenCode, SIG, production documentaire, compétences, optimisation DSPy et apprentissage autonome SkillOpt.
+**Portée :** configuration locale Docker, profils OASIS, modèles OpenRouter, liens, mémoire SQL‑vectorielle, MCP, OpenCode, SIG, production documentaire, compétences, optimisation DSPy, apprentissage SkillOpt et découverte autonome de candidats de référence.
 
 ## Résultat synthétique
 
@@ -20,6 +20,7 @@ La configuration est **cohérente avec les mécanismes présents dans le dépôt
 | Documents | Conforme | Génération DOCX/PDF locale, taxonomie, aperçu et contrôle qualité. |
 | Optimisation DSPy | Conforme et bornée | Évaluation d’instructions sur cas dépersonnalisés approuvés, propositions `pending_approval`, sans promotion automatique. |
 | Apprentissage SkillOpt | Conforme par revue statique et test sans LLM | Compétence `SKILL.md` autorisée, partitions train/validation/holdout séparées, score déterministe, cycle autonome quotidien plafonné et promotion bloquée. |
+| Mineur de références | Conforme par revue statique | Lit seulement les enregistrements `approved`, `completed` et `learning_eligible`, dépersonnalise/dédoublonne localement, écrit des candidats séparés et bloque toute promotion. |
 
 ## Conformité aux mécanismes du moteur
 
@@ -37,6 +38,7 @@ La structure suit les mécanismes documentés et implémentés par Spacebot. Les
 | Cortex | Toutes les 900 secondes | Diminue les vérifications de fond. |
 | Optimiseur DSPy | 2 cas, 1 candidat, 8 appels | Rend les itérations d’instructions contrôlables et peu coûteuses. |
 | SkillOpt | 2/2/2 cas train/validation/holdout, 1 époque, 1 exécution/jour | Apprentissage autonome d’une procédure spécialisée, avec score séparé et sortie `pending_approval`. |
+| Mineur de références | 3 candidats par cible, 1 exécution/jour | Découverte locale bornée, sans appel de modèle et sans écriture dans les packs actifs. |
 
 ## Tests exécutés
 
@@ -44,20 +46,20 @@ La structure suit les mécanismes documentés et implémentés par Spacebot. Les
 | --- | --- |
 | `python3 validate_static.py` | Réussi : topologie, routage, compaction, MCP ciblés, OpenCode, services, taxonomie et compétences vérifiés. |
 | `bash -n bootstrap_instance.sh` | Réussi. |
-| Validation de syntaxe Node des services mémoire, SIG, documents, DSPy et SkillOpt | Réussie. |
+| Validation de syntaxe Node des services mémoire, SIG, documents, DSPy, SkillOpt et mineur de références | Réussie. |
 | Compilation syntaxique Python de l’optimiseur DSPy, du pilote SkillOpt et de l’adaptateur OASIS | Réussie. |
 | Test de cas de référence DSPy approuvé fictif | Réussi : validation et état sans appel de modèle. |
 | Test SkillOpt de pack approuvé fictif | Réussi : validation de six cas séparés et arrêt autonome sans appel de modèle lorsque `autonomous_learning=false`. |
 | Test du correctif d’enregistrement SkillOpt | Réussi : l’adaptateur OASIS est injecté dans les commandes d’entraînement et d’évaluation de la révision upstream figée. |
-| Initialisation complète de l’instance avec environnement fictif | Réussie : compétences, espace DSPy/SkillOpt, gabarits et taxonomie créés puis nettoyés. |
+| Initialisation complète de l’instance avec environnement fictif | Réussie : compétences, espace DSPy/SkillOpt/mineur, gabarits et taxonomie créés puis nettoyés. |
 | Compilation Rust complète | Non exécutée : le dépôt exige Rust Edition 2024, alors que l’environnement de validation fournit Cargo 1.75. Le code applicatif n’a pas été modifié; le blocage est uniquement lié à la version de l’outil local. |
 | Construction et démarrage Docker | À exécuter sur la machine municipale : Docker n’est pas installé dans l’environnement de validation. |
 
 ## Contrôles obligatoires avant mise en production
 
-La personne responsable doit fournir une clé OpenRouter et un mot de passe PostgreSQL fort dans `.env`, lancer `./bootstrap_instance.sh`, puis exécuter `docker compose up -d --build`. Elle doit ensuite vérifier les états de santé de `oasis-memory-db`, `oasis-shared-memory`, `oasis-gis`, `oasis-document-studio`, `oasis-optimizer`, `oasis-skillopt` et l’accès à l’interface Web sur `127.0.0.1:19898`.
+La personne responsable doit fournir une clé OpenRouter, un mot de passe PostgreSQL fort et un jeton aléatoire `OASIS_MEMORY_EXPORT_TOKEN` dans `.env`, lancer `./bootstrap_instance.sh`, puis exécuter `docker compose up -d --build`. Elle doit ensuite vérifier les états de santé de `oasis-memory-db`, `oasis-shared-memory`, `oasis-gis`, `oasis-document-studio`, `oasis-optimizer`, `oasis-skillopt`, `oasis-reference-miner` et l’accès à l’interface Web sur `127.0.0.1:19898`.
 
-Avant d’utiliser la boucle DSPy, créer un jeu de référence dépersonnalisé, le faire approuver, puis conserver l’approbation dans `00_systeme/optimisation/reference_cases.approved.json`. Avant d’activer l’apprentissage SkillOpt, créer un pack distinct, dépersonnalisé et approuvé dans `00_systeme/optimisation/skillopt/skillopt_reference_pack.approved.json`, vérifier ses partitions train/validation/holdout et ses critères déterministes, exécuter un premier essai manuel, puis seulement régler `autonomous_learning` à `true`. Avant d’utiliser une superficie dans un PSE ou un rapport officiel, fournir ou tracer les emprises validées P1/P2/P3 et conserver la méthode SIG, le système de coordonnées et les sources.
+Avant d’utiliser le mineur, copier sa politique de référence, la faire approuver, puis conserver `reference_mining_policy.approved.json` dans `00_systeme/optimisation/reference-miner/`; la politique doit conserver `auto_promote=false`. Marquer une tâche source comme admissible seulement après sa clôture et son approbation, avec `completed=true`, `learning_eligible=true`, références de source et critères `reference_expected`. Avant d’utiliser la boucle DSPy, créer un jeu de référence dépersonnalisé, le faire approuver, puis conserver l’approbation dans `00_systeme/optimisation/reference_cases.approved.json`. Avant d’activer l’apprentissage SkillOpt, créer un pack distinct, dépersonnalisé et approuvé dans `00_systeme/optimisation/skillopt/skillopt_reference_pack.approved.json`, vérifier ses partitions train/validation/holdout et ses critères déterministes, exécuter un premier essai manuel, puis seulement régler `autonomous_learning` à `true`. Avant d’utiliser une superficie dans un PSE ou un rapport officiel, fournir ou tracer les emprises validées P1/P2/P3 et conserver la méthode SIG, le système de coordonnées et les sources.
 
 ## Références de conformité
 

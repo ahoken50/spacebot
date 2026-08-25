@@ -1,0 +1,33 @@
+{
+  "status": "draft",
+  "reviewed_by": "",
+  "reviewed_at": "",
+  "allow_reference_mining": false,
+  "autonomous_mining": false,
+  "redaction_required": true,
+  "auto_promote": false,
+  "allowed_record_types": [
+    "deliverable",
+    "document",
+    "schedule",
+    "indicator",
+    "meeting"
+  ],
+  "selection_rules": {
+    "require_status": "approved",
+    "require_completed": true,
+    "require_learning_eligible": true,
+    "require_source_references": true,
+    "require_reference_expected": true,
+    "deduplicate_by": "redacted_task_and_expected",
+    "max_candidates_per_target": 3
+  },
+  "prohibited_content": [
+    "documents municipaux bruts",
+    "renseignements personnels",
+    "contrats non publiés",
+    "secrets ou identifiants",
+    "preuves non vérifiées"
+  ],
+  "notes": "Copier ce fichier sous le nom reference_mining_policy.approved.json, vérifier les types d’enregistrements autorisés, renseigner le réviseur puis définir status=approved et allow_reference_mining=true. Définir autonomous_mining=true uniquement après un premier essai manuel. auto_promote doit rester false."
+}

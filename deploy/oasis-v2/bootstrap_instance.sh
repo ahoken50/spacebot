@@ -15,6 +15,7 @@ mkdir -p "${INSTANCE_DIR}/agents" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/propositions" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/propositions" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/runs" \
+  "${SHARED_WORKSPACE}/00_systeme/optimisation/reference-miner" \
   "${SHARED_WORKSPACE}/01_sources/00_inbox" \
   "${SHARED_WORKSPACE}/01_sources/01_convention" \
   "${SHARED_WORKSPACE}/01_sources/02_budget_depenses" \
@@ -69,6 +70,7 @@ cp -R "${ROOT_DIR}/skills" "${INSTANCE_DIR}/skills"
 cp --update=none "${ROOT_DIR}/document-studio/taxonomy.json" "${SHARED_WORKSPACE}/00_systeme/taxonomie_documentaire.json"
 cp --update=none "${ROOT_DIR}/optimizer/fixtures/reference_cases.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/reference_cases.template.json"
 cp --update=none "${ROOT_DIR}/skillopt/fixtures/skillopt_reference_pack.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/skillopt_reference_pack.template.json"
+cp --update=none "${ROOT_DIR}/reference-miner/fixtures/reference_mining_policy.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/reference-miner/reference_mining_policy.template.json"
 cp --update=none "${ROOT_DIR}/templates/"* "${SHARED_WORKSPACE}/07_livrables/00_reference/"
 
 write_profile() {
@@ -121,7 +123,7 @@ write_profile \
   "Coordonnateur OASIS-V2" \
   "Recevoir les demandes depuis l’interface Web, clarifier l’objectif, créer un plan de travail, déléguer aux profils appropriés, consolider les résultats et demander les approbations requises. Maintenir la cohérence entre budget, calendrier, PSE, rapports et comité." \
   "Rester orienté vers le résultat fini, vérifiable et utile à la Ville. Préserver la traçabilité de toute décision, ne pas court-circuiter l’expertise des profils spécialisés, et résumer les arbitrages à l’administration." \
-  "oasis-coordination oasis-financial-control oasis-schedule-governance oasis-pse-sig oasis-reporting oasis-document-studio oasis-supervised-optimization oasis-skillopt-learning"
+  "oasis-coordination oasis-financial-control oasis-schedule-governance oasis-pse-sig oasis-reporting oasis-document-studio oasis-supervised-optimization oasis-skillopt-learning oasis-reference-case-mining"
 
 write_profile \
   "oasis-finances" \
@@ -164,6 +166,8 @@ cat > "${SHARED_WORKSPACE}/README.md" <<'EOF'
 La structure numérotée est la référence de classement. Déposez d’abord les nouvelles pièces dans `01_sources/00_inbox/`, puis utilisez la taxonomie `00_systeme/taxonomie_documentaire.json` et l’outil `classify_workspace_document` pour les déplacer vers un dossier autorisé. Les versions de travail, révisions, documents approuvés et documents transmis vont respectivement dans `07_livrables/01_brouillons/`, `07_livrables/02_revue_qualite/`, `07_livrables/03_approuves/` et `07_livrables/04_transmis/`.
 
 Les documents confidentiels, clés API et mots de passe ne doivent jamais être placés dans cet espace. Les références doivent être enregistrées dans le registre partagé avec le nom de fichier, la date, la section ou l’onglet source, ainsi que le chemin classé et le statut du document.
+
+Le mineur de références ne lit que les enregistrements partagés `approved`, `completed=true` et `learning_eligible=true`. Il écrit ses candidats séparément dans `00_systeme/optimisation/reference-miner/`; ces fichiers ne sont jamais des packs actifs DSPy ou SkillOpt.
 EOF
 
 cat > "${INSTANCE_DIR}/README-local.md" <<'EOF'

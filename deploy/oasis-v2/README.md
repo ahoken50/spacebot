@@ -13,6 +13,7 @@ Cette configuration prépare une instance Spacebot destinée au suivi de la conv
 | `oasis-document-studio` | Serveur MCP documentaire local : DOCX/PDF, aperçu PNG et contrôle qualité. | `instance/shared-workspace/` |
 | `oasis-optimizer` | Boucle DSPy : évalue et propose des améliorations d’instructions courtes sur cas approuvés. | `instance/shared-workspace/00_systeme/optimisation/` |
 | `oasis-skillopt` | Boucle SkillOpt : apprend de façon périodique une procédure `SKILL.md` autorisée, sur partitions de test séparées. | `instance/shared-workspace/00_systeme/optimisation/skillopt/` |
+| `oasis-reference-miner` | Mineur local : extrait, dépersonnalise et dédoublonne des candidats de référence issus d’enregistrements explicitement admissibles. | `instance/shared-workspace/00_systeme/optimisation/reference-miner/` |
 | OpenRouter | Routage des modèles de génération et création d’embeddings; les vecteurs générés sont mis en cache dans PostgreSQL. | Compte OpenRouter de la Ville |
 
 ## Profils et circulation du travail
@@ -112,7 +113,7 @@ Le service `oasis-document-studio` donne aux agents les outils `get_document_tax
 
 ## Compétences préchargées par profil
 
-Chaque agent charge systématiquement la compétence commune `oasis-foundation`, qui impose la traçabilité, le classement, la mémoire partagée, l’approbation humaine et la sobriété des échanges. Les autres compétences sont copiées dans le workspace du profil lors de l’initialisation : le coordonnateur reçoit la coordination, les procédures financières, calendaires, PSE, de reddition, documentaires, l’optimisation DSPy et l’apprentissage SkillOpt; l’analyste financier reçoit finance, reddition et documents; le planificateur reçoit calendrier, reddition et documents; l’analyste PSE/SIG reçoit SIG et documents; le rédacteur reçoit reddition, documents, finances et PSE; et le secrétaire reçoit gouvernance, calendrier et documents.
+Chaque agent charge systématiquement la compétence commune `oasis-foundation`, qui impose la traçabilité, le classement, la mémoire partagée, l’approbation humaine et la sobriété des échanges. Les autres compétences sont copiées dans le workspace du profil lors de l’initialisation : le coordonnateur reçoit la coordination, les procédures financières, calendaires, PSE, de reddition, documentaires, l’optimisation DSPy, l’apprentissage SkillOpt et le minage de références; l’analyste financier reçoit finance, reddition et documents; le planificateur reçoit calendrier, reddition et documents; l’analyste PSE/SIG reçoit SIG et documents; le rédacteur reçoit reddition, documents, finances et PSE; et le secrétaire reçoit gouvernance, calendrier et documents.
 
 Cette répartition évite de charger à tous les agents des instructions inutiles tout en laissant les procédures communes disponibles. Les compétences sont uniquement des directives opératoires; les données factuelles demeurent dans le registre commun et les dossiers classés.
 
@@ -123,6 +124,16 @@ Le coordonnateur dispose seul du service `oasis-supervised-optimizer` et de la c
 Le conteneur et l’outil DSPy sont **actifs par défaut** au démarrage de la pile (`OASIS_OPTIMIZER_ENABLED=true`). Cette activation ne planifie ni n’exécute aucun appel de modèle : elle rend disponibles le statut, la validation du jeu de référence et, au coordonnateur seulement, l’action manuelle de proposition. Pour effectuer une optimisation, copier `00_systeme/optimisation/reference_cases.template.json` en `reference_cases.approved.json`, remplacer les exemples fictifs par un ou deux cas représentatifs puis obtenir l’approbation humaine en inscrivant le statut `approved`, le réviseur et la date. Le coordonnateur valide ensuite le jeu de référence et lance explicitement une proposition avec un seul candidat. Les métriques déterministes évaluent les termes essentiels, les assertions interdites, les marqueurs de source et la concision. Les propositions sont écrites sous `00_systeme/optimisation/propositions/` avec le statut `pending_approval`. Pour désactiver l’action de proposition tout en gardant le service de statut et de validation, définir `OASIS_OPTIMIZER_ENABLED=false` dans `.env` puis redémarrer la pile.
 
 Les limites par défaut sont de deux cas, un candidat et huit appels de modèle. L’optimiseur ne peut ni modifier `config.toml`, ni changer un modèle, une compétence, un outil, une dépendance ou une permission. Une amélioration ne devient active qu’après une revue humaine et un changement versionné distinct. Cette séparation permet de bénéficier d’un processus de type DSPy tout en évitant l’auto-modification libre et les coûts incontrôlés.
+
+## Découverte autonome de candidats de référence
+
+Le coordonnateur dispose seul du service `oasis-reference-miner`. Il ne recherche ni ne lit les documents sources bruts. Il reçoit, par un endpoint interne authentifié, uniquement les enregistrements du registre commun qui sont **tous** `approved`, `completed=true`, `learning_eligible=true`, associés à une ou plusieurs références de source et munis de critères `reference_expected` structurés. Aucun appel de modèle ni embedding n’est créé par cette découverte : elle opère localement sur les preuves déjà enregistrées.
+
+Le mineur retire les doublons selon la tâche et les critères attendus normalisés, remplace localement les noms complets, courriels, téléphones, montants et numéros longs par des marqueurs, puis produit deux fichiers séparés : `dspy_candidates.json` et `skillopt_candidates.json`. Un candidat DSPy exige en plus `agent_id` et `baseline_instruction`; un candidat SkillOpt exige `skill_id`. Les fichiers contiennent la provenance, les références de source, le statut `candidate` et `promotion: blocked_pending_approval`.
+
+Pour l’autoriser, copier `reference_mining_policy.template.json` en `reference_mining_policy.approved.json`, définir `status: approved`, `allow_reference_mining: true`, les types d’enregistrement autorisés et, après un essai manuel, `autonomous_mining: true`. Le service vérifie la politique 30 secondes après son démarrage puis toutes les 24 heures par défaut, avec trois candidats par cible et une exécution par jour. `auto_promote` doit toujours rester `false` : toute tentative de l’activer est rejetée par le service.
+
+> Le mineur découvre et prépare des exemples; il ne décide jamais de leur qualité métier. Pour rendre une tâche admissible, l’agent doit la terminer, obtenir son approbation, consigner des sources et définir explicitement la tâche de référence ainsi que ses critères de réussite. Le coordonnateur contrôle ensuite les candidats et les copie dans des partitions DSPy ou SkillOpt distinctes.
 
 ## Apprentissage autonome de compétences avec SkillOpt
 
@@ -146,7 +157,7 @@ Les changements durables — ajout de conteneur, MCP, dépendance, modèle, secr
 
 Le serveur `oasis-shared-memory` fournit à chaque travailleur quatre opérations : enregistrer un élément, rechercher sémantiquement, lire un élément et lier deux éléments. Les enregistrements structurés couvrent notamment les décisions, dépenses, contrats, appels d’offres, jalons, indicateurs, projets, livrables, réunions, risques et documents. Chaque écriture conserve l’auteur, les références de source, le statut, l’horodatage et une trace d’audit. Le contenu indexé est plafonné à 6 000 caractères et les recherches retournent des extraits de 1 200 caractères au plus, afin de ne pas injecter inutilement des documents complets dans le contexte.
 
-Les éléments susceptibles d’avoir une incidence contractuelle, financière ou réglementaire doivent être enregistrés avec le statut `pending_approval`. Seule une validation humaine peut les faire passer à `approved`. Le serveur ne fournit volontairement aucune opération de suppression physique; une correction doit créer une version remplacée ou un statut `superseded`, de façon à préserver l’audit.
+Les éléments susceptibles d’avoir une incidence contractuelle, financière ou réglementaire doivent être enregistrés avec le statut `pending_approval`. Seule une validation humaine peut les faire passer à `approved`. Un élément ne devient admissible au minage de références que si son `payload` confirme en plus `completed=true`, `learning_eligible=true`, une `reference_expected` structurée et des références de source. Le serveur ne fournit volontairement aucune opération de suppression physique; une correction doit créer une version remplacée ou un statut `superseded`, de façon à préserver l’audit.
 
 ## Sauvegarde et restauration
 

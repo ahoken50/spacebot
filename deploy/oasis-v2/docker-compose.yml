@@ -34,6 +34,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
       OASIS_EMBEDDING_MODEL: ${OASIS_EMBEDDING_MODEL:-qwen/qwen3-embedding-0.6b}
       OASIS_EMBEDDING_DIMENSIONS: ${OASIS_EMBEDDING_DIMENSIONS:-1024}
+      OASIS_MEMORY_EXPORT_TOKEN: ${OASIS_MEMORY_EXPORT_TOKEN:?Définir OASIS_MEMORY_EXPORT_TOKEN dans .env}
     depends_on:
       oasis-memory-db:
         condition: service_healthy
@@ -172,6 +173,45 @@ services:
     networks:
       - oasis_internal
 
+  oasis-reference-miner:
+    build:
+      context: ./reference-miner
+    image: oasis-reference-miner:local
+    container_name: oasis-reference-miner
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "3015"
+      OASIS_WORKSPACE: /workspace
+      OASIS_MEMORY_EXPORT_URL: http://oasis-shared-memory:3010/internal/reference-records
+      OASIS_MEMORY_EXPORT_TOKEN: ${OASIS_MEMORY_EXPORT_TOKEN:?Définir OASIS_MEMORY_EXPORT_TOKEN dans .env}
+      # La découverte peut être autonome, mais tout candidat reste séparé des packs actifs.
+      OASIS_REFERENCE_MINER_ENABLED: ${OASIS_REFERENCE_MINER_ENABLED:-true}
+      OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED: ${OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED:-true}
+      OASIS_REFERENCE_MINER_CYCLE_HOURS: ${OASIS_REFERENCE_MINER_CYCLE_HOURS:-24}
+      OASIS_REFERENCE_MINER_MAX_CANDIDATES: ${OASIS_REFERENCE_MINER_MAX_CANDIDATES:-3}
+      OASIS_REFERENCE_MINER_MAX_RUNS_PER_DAY: ${OASIS_REFERENCE_MINER_MAX_RUNS_PER_DAY:-1}
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    depends_on:
+      oasis-shared-memory:
+        condition: service_healthy
+    expose:
+      - "3015"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3015/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - oasis_internal
+
   spacebot-oasis-v2:
     image: spacebot-oasis-v2:local
     build:
@@ -205,6 +245,8 @@ services:
       oasis-optimizer:
         condition: service_healthy
       oasis-skillopt:
+        condition: service_healthy
+      oasis-reference-miner:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true

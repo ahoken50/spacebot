@@ -10,6 +10,7 @@ const { Pool } = pg;
 const port = Number.parseInt(process.env.PORT ?? '3010', 10);
 const databaseUrl = requiredEnvironment('DATABASE_URL');
 const openRouterApiKey = requiredEnvironment('OPENROUTER_API_KEY');
+const referenceExportToken = requiredEnvironment('OASIS_MEMORY_EXPORT_TOKEN');
 const embeddingModel = process.env.OASIS_EMBEDDING_MODEL ?? 'qwen/qwen3-embedding-0.6b';
 const embeddingDimensions = Number.parseInt(process.env.OASIS_EMBEDDING_DIMENSIONS ?? '1024', 10);
 const queryEmbeddingCache = new Map();
@@ -347,6 +348,44 @@ app.post('/mcp', async (request, response) => {
 
 app.get('/mcp', (_request, response) => {
   response.status(405).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed' }, id: null });
+});
+
+app.get('/internal/reference-records', async (request, response) => {
+  const authorization = request.get('authorization') ?? '';
+  if (authorization !== `Bearer ${referenceExportToken}`) {
+    response.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const limit = Math.min(50, Math.max(1, Number.parseInt(String(request.query.limit ?? '12'), 10) || 12));
+  const recordTypes = String(request.query.record_types ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => /^[a-z_]{3,80}$/.test(value))
+    .slice(0, 12);
+  if (recordTypes.length === 0) {
+    response.status(400).json({ error: 'record_types is required' });
+    return;
+  }
+  try {
+    const result = await pool.query(
+      `
+        SELECT id, external_key, record_type, scope, title,
+               LEFT(content, 4000) AS content, payload, source_references,
+               created_by, status, created_at, updated_at
+        FROM shared_records
+        WHERE status = 'approved'
+          AND record_type = ANY($1::text[])
+          AND payload @> '{"learning_eligible": true, "completed": true}'::jsonb
+        ORDER BY updated_at DESC
+        LIMIT $2
+      `,
+      [recordTypes, limit],
+    );
+    response.status(200).json({ records: result.rows, limit, record_types: recordTypes });
+  } catch (error) {
+    console.error('Reference record export failed', error);
+    response.status(503).json({ error: 'Reference record export unavailable' });
+  }
 });
 
 app.get('/health', async (_request, response) => {

@@ -154,6 +154,12 @@ name = "oasis_skillopt"
 transport = "http"
 url = "http://oasis-skillopt:3014/mcp"
 
+# Le mineur propose seulement des candidats dépersonnalisés; il ne modifie aucun pack actif.
+[[agents.mcp]]
+name = "oasis_reference_miner"
+transport = "http"
+url = "http://oasis-reference-miner:3015/mcp"
+
 [[agents]]
 id = "oasis-finances"
 display_name = "Analyste financier OASIS-V2"

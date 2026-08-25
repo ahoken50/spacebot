@@ -57,7 +57,7 @@ assert 'ENV PATH="/root/.bun/bin:${PATH}"' in root_dockerfile, 'Le chemin runtim
 mcp = {entry['name']: entry['url'] for entry in config['defaults']['mcp']}
 assert mcp == {'oasis_shared_memory': 'http://oasis-shared-memory:3010/mcp'}, 'La mémoire commune doit être l’unique MCP partagé par défaut.'
 expected_agent_mcp = {
-    'oasis-coordination': {'oasis_document_studio', 'oasis_supervised_optimizer', 'oasis_skillopt'},
+    'oasis-coordination': {'oasis_document_studio', 'oasis_supervised_optimizer', 'oasis_skillopt', 'oasis_reference_miner'},
     'oasis-finances': {'oasis_document_studio'},
     'oasis-calendrier': {'oasis_document_studio'},
     'oasis-pse-sig': {'oasis_gis_local', 'oasis_document_studio'},
@@ -69,7 +69,7 @@ for agent in agents:
     assert tool_names == expected_agent_mcp[agent['id']], f'MCP ciblés incorrects pour {agent["id"]}: {tool_names}'
 coordination = next(agent for agent in agents if agent['id'] == 'oasis-coordination')
 assert coordination['browser']['enabled'] is True
-for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'spacebot-oasis-v2:'):
+for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
 optimizer_server = (ROOT / 'optimizer' / 'server.js').read_text(encoding='utf-8')
@@ -77,6 +77,12 @@ assert "process.env.OASIS_OPTIMIZER_ENABLED ?? 'true'" in optimizer_server, 'Le 
 assert "confirm_approved_reference_pack: z.literal(true)" in optimizer_server, 'Une confirmation de jeu approuvé doit rester obligatoire.'
 assert 'OASIS_SKILLOPT_ENABLED: ${OASIS_SKILLOPT_ENABLED:-true}' in compose, 'SkillOpt doit être actif par défaut.'
 assert 'OASIS_SKILLOPT_AUTONOMOUS_ENABLED: ${OASIS_SKILLOPT_AUTONOMOUS_ENABLED:-true}' in compose, 'Le cycle SkillOpt autonome doit être configurable et actif par défaut.'
+assert 'OASIS_MEMORY_EXPORT_TOKEN: ${OASIS_MEMORY_EXPORT_TOKEN:?Définir OASIS_MEMORY_EXPORT_TOKEN dans .env}' in compose, 'L’export mémoire interne doit exiger un jeton local.'
+assert 'OASIS_REFERENCE_MINER_ENABLED: ${OASIS_REFERENCE_MINER_ENABLED:-true}' in compose, 'Le mineur de références doit être actif par défaut.'
+assert 'OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED: ${OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED:-true}' in compose, 'Le cycle autonome du mineur doit être configurable.'
+reference_miner_server = (ROOT / 'reference-miner' / 'server.js').read_text(encoding='utf-8')
+assert "payload.learning_eligible === true" in reference_miner_server and "payload.completed === true" in reference_miner_server, 'Le mineur doit limiter ses sources aux tâches explicitement admissibles et terminées.'
+assert "policy.auto_promote === true" in reference_miner_server and "promotion: 'blocked_pending_approval'" in reference_miner_server, 'Le mineur ne doit jamais promouvoir un candidat automatiquement.'
 skillopt_server = (ROOT / 'skillopt' / 'server.js').read_text(encoding='utf-8')
 skillopt_runner = (ROOT / 'skillopt' / 'skillopt_runner.py').read_text(encoding='utf-8')
 assert "OASIS_SKILLOPT_ENABLED ?? 'true'" in skillopt_server, 'Le serveur SkillOpt doit être actif par défaut.'
@@ -93,6 +99,7 @@ for dockerfile in (
     ROOT / 'document-studio' / 'Dockerfile',
     ROOT / 'optimizer' / 'Dockerfile',
     ROOT / 'skillopt' / 'Dockerfile',
+    ROOT / 'reference-miner' / 'Dockerfile',
 ):
     dockerfile_text = dockerfile.read_text(encoding='utf-8')
     assert 'frozen-lockfile=false' not in dockerfile_text, f'Argument Bun invalide dans {dockerfile}.'
@@ -123,6 +130,9 @@ for required in [
     ROOT / 'skillopt' / 'server.js',
     ROOT / 'skillopt' / 'skillopt_runner.py',
     ROOT / 'skillopt' / 'fixtures' / 'skillopt_reference_pack.template.json',
+    ROOT / 'reference-miner' / 'Dockerfile',
+    ROOT / 'reference-miner' / 'server.js',
+    ROOT / 'reference-miner' / 'fixtures' / 'reference_mining_policy.template.json',
     ROOT / 'skills' / 'oasis-foundation' / 'SKILL.md',
     ROOT / 'skills' / 'oasis-capability-discovery' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md',
@@ -134,8 +144,9 @@ for required in [
     ROOT / 'profile-skills' / 'oasis-document-studio' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-supervised-optimization' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-skillopt-learning' / 'SKILL.md',
+    ROOT / 'profile-skills' / 'oasis-reference-case-mining' / 'SKILL.md',
 ]:
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: suggest | Taxonomie: 8 catégories | DSPy: actif et supervisé | SkillOpt: autonome borné et à promotion bloquée | Sobriété: activée')
+print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: suggest | Taxonomie: 8 catégories | DSPy: actif et supervisé | SkillOpt: autonome borné | Mineur de références: local et sans promotion | Sobriété: activée')
