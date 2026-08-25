@@ -149,6 +149,16 @@ La cible est limitée aux compétences spécialisées de coordination, finances,
 
 Pour l’activer manuellement après un premier essai, copier `skillopt_reference_pack.template.json` en `skillopt_reference_pack.approved.json`, adapter les six cas de référence, faire approuver le pack et régler `autonomous_learning` à `true`. Dans la chaîne autonome, le mineur prépare ces partitions et déclenche SkillOpt lui-même. Pour mettre la boucle en pause, définir `OASIS_SKILLOPT_AUTONOMOUS_ENABLED=false`; pour désactiver complètement les outils SkillOpt, définir `OASIS_SKILLOPT_ENABLED=false`, puis relancer la pile. Les contrôles `skillopt_status`, `skillopt_validate_reference_pack`, `skillopt_learn` et `skillopt_autonomous_cycle` restent accessibles au coordonnateur seulement.
 
+## Approbation finale dans l’interface Spacebot
+
+Le service local `oasis-approval-bridge` transforme chaque proposition DSPy ou SkillOpt en une tâche Spacebot `pending_approval`, assignée au coordonnateur et visible dans la file d’approbation et les notifications de l’interface Web. La tâche présente le type de proposition, les scores, les partitions, les chemins locaux des artefacts et les consignes de revue. Le pont ne crée aucun nouveau bouton ou accès public : il s’appuie sur le mécanisme natif de tâches, de notifications et d’approbation de Spacebot.
+
+L’utilisateur ouvre la tâche, examine les artefacts avec le coordonnateur si nécessaire, puis sélectionne **Approve**. Spacebot fait passer la tâche à `ready`, enregistre l’approbateur et l’horodatage, puis le pont applique la candidate de façon contrôlée : une instruction DSPy devient une compétence locale d’instructions approuvées pour le profil ciblé; une candidate SkillOpt remplace uniquement le `SKILL.md` du profil autorisé. Il enregistre ensuite un manifeste sous `00_systeme/optimisation/approval-bridge/promotions/` et clôt la tâche. Le service ne traite pas une tâche `pending_approval`, et aucune candidature ne peut être appliquée sans le passage préalable à `ready` depuis l’interface.
+
+Pour rejeter la proposition, utiliser **Dismiss** dans la file d’approbation. Spacebot replace la tâche dans `backlog`; le pont marque alors la proposition `rejected_by_user`, préserve les fichiers de revue et interdit toute promotion. Une nouvelle optimisation produit une nouvelle tâche; la proposition rejetée n’est pas réouverte silencieusement.
+
+Le pont vérifie l’état des tâches toutes les 60 secondes par défaut. Il utilise un réseau Docker interne dédié et le service Spacebot n’est le seul autre conteneur relié à ce réseau. Un jeton `OASIS_APPROVAL_BRIDGE_TOKEN` est requis pour tout déclenchement interne manuel; l’approbation elle-même se réalise exclusivement dans l’interface locale Spacebot.
+
 ## Découverte et évolution contrôlée des capacités
 
 La compétence commune `oasis-capability-discovery` impose une vérification avant toute recherche externe : l’agent commence par inventorier les compétences chargées, les gabarits de `00_systeme/`, les scripts, les binaires persistants et les outils MCP disponibles. Une capacité existante est réutilisée plutôt que dupliquée. Lorsqu’elle est absente, l’agent peut rechercher une compétence reconnue ou créer une compétence réutilisable dans son propre workspace; Spacebot la recharge immédiatement sans redémarrage. [8]

@@ -274,7 +274,45 @@ services:
       start_period: 45s
     networks:
       - oasis_internal
+      - oasis_approval_internal
+
+  oasis-approval-bridge:
+    build:
+      context: ./approval-bridge
+    image: oasis-approval-bridge:local
+    container_name: oasis-approval-bridge
+    restart: unless-stopped
+    environment:
+      PORT: "3016"
+      OASIS_WORKSPACE: /data/shared-workspace
+      OASIS_INSTANCE_ROOT: /data
+      OASIS_SPACEBOT_API_URL: http://spacebot-oasis-v2:19898/api
+      OASIS_APPROVAL_BRIDGE_ENABLED: ${OASIS_APPROVAL_BRIDGE_ENABLED:-true}
+      OASIS_APPROVAL_BRIDGE_INTERVAL_SECONDS: ${OASIS_APPROVAL_BRIDGE_INTERVAL_SECONDS:-60}
+      OASIS_APPROVAL_BRIDGE_TOKEN: ${OASIS_APPROVAL_BRIDGE_TOKEN:?Définir OASIS_APPROVAL_BRIDGE_TOKEN dans .env}
+    volumes:
+      - ./instance:/data:rw
+    depends_on:
+      spacebot-oasis-v2:
+        condition: service_healthy
+    expose:
+      - "3016"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3016/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - oasis_approval_internal
 
 networks:
   oasis_internal:
     driver: bridge
+  oasis_approval_internal:
+    driver: bridge
+    internal: true

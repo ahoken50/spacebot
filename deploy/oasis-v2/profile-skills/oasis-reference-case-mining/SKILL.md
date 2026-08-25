@@ -16,7 +16,7 @@ Créer des **candidats** de cas de référence réutilisables à partir d’enre
 3. Lancer `reference_miner_discover_candidates` pour un essai. Après vérification, activer `autonomous_mining=true` et `autonomous_pipeline=true` dans la politique afin que `reference_miner_autonomous_cycle` applique le plafond périodique autorisé.
 4. Le pipeline produit `dspy_candidates.json`, `skillopt_candidates.json` et des packs temporaires `system_validated` dans `00_systeme/optimisation/reference-miner/autonomous-packs/`.
 5. Il déclenche ensuite les évaluations DSPy et SkillOpt sur ces packs temporaires, en respectant leurs quotas existants et en enregistrant une proposition `pending_approval`.
-6. Examiner seulement la proposition finale, son diff, les scores, les références et les contrôles holdout avant de prendre la décision d’approbation ou de rejet.
+6. Le pont d’approbation crée automatiquement une tâche `pending_approval` dans l’interface Spacebot avec le chemin de la proposition, les scores et les références. Examiner le diff et les preuves avec le coordonnateur, puis utiliser **Approve** dans le tableau de tâches pour appliquer la candidate, ou **Dismiss** pour la rejeter. Ne jamais modifier directement une proposition à la place de ce flux.
 
 ## Admissibilité minimale
 
@@ -30,6 +30,7 @@ Ne jamais :
 - désactiver la dépersonnalisation ou les contrôles de déduplication;
 - modifier `reference_cases.approved.json`, `skillopt_reference_pack.approved.json`, la configuration, les modèles, les permissions ou les services de production;
 - définir `auto_promote=true`;
-- promouvoir un candidat sans vérifier sa réponse attendue, ses sources et sa séparation de partitions.
+- promouvoir un candidat sans vérifier sa réponse attendue, ses sources et sa séparation de partitions;
+- contourner la tâche `pending_approval` créée par le pont d’approbation.
 
-> L’autonomie couvre la découverte, le partitionnement, l’évaluation et la proposition. Elle s’arrête à l’approbation finale de l’utilisateur, qui est la seule étape capable de promouvoir une instruction ou une compétence.
+> L’autonomie couvre la découverte, le partitionnement, l’évaluation, la création de la tâche et la proposition. Elle s’arrête à l’action **Approve** de l’utilisateur dans l’interface, qui est la seule étape capable de promouvoir une instruction ou une compétence.

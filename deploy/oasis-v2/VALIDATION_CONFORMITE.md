@@ -2,7 +2,7 @@
 
 **Date de contrôle :** 25 août 2026
 
-**Portée :** configuration locale Docker, profils OASIS, modèles OpenRouter, liens, mémoire SQL‑vectorielle, MCP, OpenCode, SIG, production documentaire, compétences et chaîne autonome de découverte, évaluation DSPy/SkillOpt et proposition finale de référence.
+**Portée :** configuration locale Docker, profils OASIS, modèles OpenRouter, liens, mémoire SQL‑vectorielle, MCP, OpenCode, SIG, production documentaire, compétences et chaîne autonome de découverte, évaluation DSPy/SkillOpt, demande d’approbation dans l’interface et promotion contrôlée.
 
 ## Résultat synthétique
 
@@ -20,7 +20,8 @@ La configuration est **cohérente avec les mécanismes présents dans le dépôt
 | Documents | Conforme | Génération DOCX/PDF locale, taxonomie, aperçu et contrôle qualité. |
 | Optimisation DSPy | Conforme et bornée | Évaluation manuelle ou déclenchée par pack temporaire authentifié, propositions `pending_approval`, sans promotion automatique. |
 | Apprentissage SkillOpt | Conforme par revue statique et test sans LLM | Compétence `SKILL.md` autorisée, partitions train/validation/holdout séparées, score déterministe, exécution autonome plafonnée et promotion bloquée. |
-| Pipeline de références | Conforme par revue statique et test de packs | Lit seulement les enregistrements `approved`, `completed` et `learning_eligible`, dépersonnalise/dédoublonne, partitionne, déclenche les évaluations et bloque la promotion finale. |
+| Pipeline de références | Conforme par revue statique et test de packs | Lit seulement les enregistrements `approved`, `completed` et `learning_eligible`, dépersonnalise/dédoublonne, partitionne et déclenche les évaluations. |
+| Pont d’approbation UI | Conforme par revue statique | Crée une tâche Spacebot `pending_approval`, traite exclusivement `ready` comme approbation, archive un rejet `backlog` et applique la candidate seulement après l’action utilisateur. |
 
 ## Conformité aux mécanismes du moteur
 
@@ -38,7 +39,8 @@ La structure suit les mécanismes documentés et implémentés par Spacebot. Les
 | Cortex | Toutes les 900 secondes | Diminue les vérifications de fond. |
 | Optimiseur DSPy | 2 cas, 1 candidat, 8 appels | Rend les itérations d’instructions contrôlables et peu coûteuses. |
 | SkillOpt | 2/2/2 cas train/validation/holdout, 1 époque, 1 exécution/jour | Apprentissage autonome d’une procédure spécialisée, avec score séparé et sortie `pending_approval`. |
-| Pipeline de références | 3 candidats par cible, 1 exécution/jour | Découverte locale, préparation de packs temporaires, DSPy/SkillOpt bornés et sortie `pending_approval`; aucune promotion. |
+| Pipeline de références | 3 candidats par cible, 1 exécution/jour | Découverte locale, préparation de packs temporaires et évaluations DSPy/SkillOpt bornées. |
+| Pont d’approbation | Vérification toutes les 60 secondes | Création d’une tâche UI, promotion seulement après `pending_approval → ready`, audit local de promotion ou de rejet. |
 
 ## Tests exécutés
 
@@ -46,21 +48,22 @@ La structure suit les mécanismes documentés et implémentés par Spacebot. Les
 | --- | --- |
 | `python3 validate_static.py` | Réussi : topologie, routage, compaction, MCP ciblés, OpenCode, services, taxonomie et compétences vérifiés. |
 | `bash -n bootstrap_instance.sh` | Réussi. |
-| Validation de syntaxe Node des services mémoire, SIG, documents, DSPy, SkillOpt et mineur de références | Réussie. |
+| Validation de syntaxe Node des services mémoire, SIG, documents, DSPy, SkillOpt, mineur de références et pont d’approbation | Réussie. |
 | Compilation syntaxique Python de l’optimiseur DSPy, du pilote SkillOpt et de l’adaptateur OASIS | Réussie. |
 | Test de cas de référence DSPy approuvé fictif | Réussi : validation et état sans appel de modèle. |
 | Test SkillOpt de pack approuvé fictif | Réussi : validation de six cas séparés et arrêt autonome sans appel de modèle lorsque `autonomous_learning=false`. |
 | Test du correctif d’enregistrement SkillOpt | Réussi : l’adaptateur OASIS est injecté dans les commandes d’entraînement et d’évaluation de la révision upstream figée. |
 | Test des packs temporaires autonomes | Réussi sans LLM : DSPy et SkillOpt acceptent seulement les packs `system_validated`, dépersonnalisés et explicitement autorisés. |
-| Initialisation complète de l’instance avec environnement fictif | Réussie : compétences, espace DSPy/SkillOpt/mineur, gabarits et taxonomie créés puis nettoyés. |
+| Pont d’approbation UI | Revue statique réussie : création de tâche `pending_approval`, promotion seulement après état `ready`, rejet `backlog` et transitions `ready → in_progress → done` vérifiés dans le contrat API Spacebot. |
+| Initialisation complète de l’instance avec environnement fictif | Réussie : compétences, espaces DSPy/SkillOpt/mineur/pont d’approbation, gabarits et taxonomie créés puis nettoyés. |
 | Compilation Rust complète | Non exécutée : le dépôt exige Rust Edition 2024, alors que l’environnement de validation fournit Cargo 1.75. Le code applicatif n’a pas été modifié; le blocage est uniquement lié à la version de l’outil local. |
 | Construction et démarrage Docker | À exécuter sur la machine municipale : Docker n’est pas installé dans l’environnement de validation. |
 
 ## Contrôles obligatoires avant mise en production
 
-La personne responsable doit fournir une clé OpenRouter, un mot de passe PostgreSQL fort, un jeton aléatoire `OASIS_MEMORY_EXPORT_TOKEN` et un second jeton `OASIS_AUTONOMOUS_PIPELINE_TOKEN` dans `.env`, lancer `./bootstrap_instance.sh`, puis exécuter `docker compose up -d --build`. Elle doit ensuite vérifier les états de santé de `oasis-memory-db`, `oasis-shared-memory`, `oasis-gis`, `oasis-document-studio`, `oasis-optimizer`, `oasis-skillopt`, `oasis-reference-miner` et l’accès à l’interface Web sur `127.0.0.1:19898`.
+La personne responsable doit fournir une clé OpenRouter, un mot de passe PostgreSQL fort, un jeton aléatoire `OASIS_MEMORY_EXPORT_TOKEN`, un second jeton `OASIS_AUTONOMOUS_PIPELINE_TOKEN` et un troisième jeton `OASIS_APPROVAL_BRIDGE_TOKEN` dans `.env`, lancer `./bootstrap_instance.sh`, puis exécuter `docker compose up -d --build`. Elle doit ensuite vérifier les états de santé de `oasis-memory-db`, `oasis-shared-memory`, `oasis-gis`, `oasis-document-studio`, `oasis-optimizer`, `oasis-skillopt`, `oasis-reference-miner`, `oasis-approval-bridge` et l’accès à l’interface Web sur `127.0.0.1:19898`.
 
-Avant d’activer le pipeline, copier sa politique de référence, la faire approuver, puis conserver `reference_mining_policy.approved.json` dans `00_systeme/optimisation/reference-miner/`; définir `autonomous_mining=true` et `autonomous_pipeline=true`, mais conserver impérativement `auto_promote=false`. Marquer une tâche source comme admissible seulement après sa clôture et son approbation, avec `completed=true`, `learning_eligible=true`, références de source et critères `reference_expected`; ajouter `agent_id` et `baseline_instruction` pour DSPy, ou `skill_id` pour SkillOpt. Le pipeline prépare, évalue et dépose alors les propositions sans autre intervention. L’utilisateur examine le diff, les scores et les références, puis approuve ou rejette la promotion finale. Avant d’utiliser une superficie dans un PSE ou un rapport officiel, fournir ou tracer les emprises validées P1/P2/P3 et conserver la méthode SIG, le système de coordonnées et les sources.
+Avant d’activer le pipeline, copier sa politique de référence, la faire approuver, puis conserver `reference_mining_policy.approved.json` dans `00_systeme/optimisation/reference-miner/`; définir `autonomous_mining=true` et `autonomous_pipeline=true`, mais conserver impérativement `auto_promote=false`. Marquer une tâche source comme admissible seulement après sa clôture et son approbation, avec `completed=true`, `learning_eligible=true`, références de source et critères `reference_expected`; ajouter `agent_id` et `baseline_instruction` pour DSPy, ou `skill_id` pour SkillOpt. Le pipeline prépare, évalue et dépose alors les propositions sans autre intervention. Le pont crée ensuite une tâche `pending_approval` dans l’interface. L’utilisateur examine le diff, les scores et les références, puis utilise **Approve** ou **Dismiss**; seul **Approve** autorise la promotion et sa trace est écrite sous `00_systeme/optimisation/approval-bridge/promotions/`. Avant d’utiliser une superficie dans un PSE ou un rapport officiel, fournir ou tracer les emprises validées P1/P2/P3 et conserver la méthode SIG, le système de coordonnées et les sources.
 
 ## Références de conformité
 

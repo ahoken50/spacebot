@@ -16,6 +16,7 @@ mkdir -p "${INSTANCE_DIR}/agents" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/propositions" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/runs" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/reference-miner" \
+  "${SHARED_WORKSPACE}/00_systeme/optimisation/approval-bridge/promotions" \
   "${SHARED_WORKSPACE}/01_sources/00_inbox" \
   "${SHARED_WORKSPACE}/01_sources/01_convention" \
   "${SHARED_WORKSPACE}/01_sources/02_budget_depenses" \
@@ -167,7 +168,7 @@ La structure numérotée est la référence de classement. Déposez d’abord le
 
 Les documents confidentiels, clés API et mots de passe ne doivent jamais être placés dans cet espace. Les références doivent être enregistrées dans le registre partagé avec le nom de fichier, la date, la section ou l’onglet source, ainsi que le chemin classé et le statut du document.
 
-Le mineur de références ne lit que les enregistrements partagés `approved`, `completed=true` et `learning_eligible=true`. Il écrit ses candidats séparément dans `00_systeme/optimisation/reference-miner/`; ces fichiers ne sont jamais des packs actifs DSPy ou SkillOpt.
+Le mineur de références ne lit que les enregistrements partagés `approved`, `completed=true` et `learning_eligible=true`. Il écrit ses candidats séparément dans `00_systeme/optimisation/reference-miner/`; ces fichiers ne sont jamais des packs actifs DSPy ou SkillOpt. Le pont d’approbation conserve les décisions et promotions validées dans `00_systeme/optimisation/approval-bridge/promotions/`.
 EOF
 
 cat > "${INSTANCE_DIR}/README-local.md" <<'EOF'

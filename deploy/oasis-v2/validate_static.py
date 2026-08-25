@@ -69,7 +69,7 @@ for agent in agents:
     assert tool_names == expected_agent_mcp[agent['id']], f'MCP ciblés incorrects pour {agent["id"]}: {tool_names}'
 coordination = next(agent for agent in agents if agent['id'] == 'oasis-coordination')
 assert coordination['browser']['enabled'] is True
-for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:'):
+for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:', 'oasis-approval-bridge:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
 optimizer_server = (ROOT / 'optimizer' / 'server.js').read_text(encoding='utf-8')
@@ -82,6 +82,7 @@ assert 'OASIS_REFERENCE_MINER_ENABLED: ${OASIS_REFERENCE_MINER_ENABLED:-true}' i
 assert 'OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED: ${OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED:-true}' in compose, 'Le cycle autonome du mineur doit être configurable.'
 assert 'OASIS_AUTONOMOUS_PIPELINE_ENABLED: ${OASIS_AUTONOMOUS_PIPELINE_ENABLED:-true}' in compose, 'Le pipeline autonome doit être activable dans Docker.'
 assert 'OASIS_AUTONOMOUS_PIPELINE_TOKEN: ${OASIS_AUTONOMOUS_PIPELINE_TOKEN:?Définir OASIS_AUTONOMOUS_PIPELINE_TOKEN dans .env}' in compose, 'Les déclenchements internes doivent être authentifiés.'
+assert 'OASIS_APPROVAL_BRIDGE_TOKEN: ${OASIS_APPROVAL_BRIDGE_TOKEN:?Définir OASIS_APPROVAL_BRIDGE_TOKEN dans .env}' in compose, 'Le pont d’approbation doit exiger un jeton local.'
 reference_miner_server = (ROOT / 'reference-miner' / 'server.js').read_text(encoding='utf-8')
 assert "payload.learning_eligible === true" in reference_miner_server and "payload.completed === true" in reference_miner_server, 'Le mineur doit limiter ses sources aux tâches explicitement admissibles et terminées.'
 assert "policy.auto_promote === true" in reference_miner_server and "promotion: 'blocked_pending_approval'" in reference_miner_server, 'Le mineur ne doit jamais promouvoir un candidat automatiquement.'
@@ -106,10 +107,16 @@ for dockerfile in (
     ROOT / 'optimizer' / 'Dockerfile',
     ROOT / 'skillopt' / 'Dockerfile',
     ROOT / 'reference-miner' / 'Dockerfile',
+    ROOT / 'approval-bridge' / 'Dockerfile',
 ):
     dockerfile_text = dockerfile.read_text(encoding='utf-8')
     assert 'frozen-lockfile=false' not in dockerfile_text, f'Argument Bun invalide dans {dockerfile}.'
     assert 'bun install --production' in dockerfile_text, f'Installation Bun de production attendue dans {dockerfile}.'
+approval_bridge = (ROOT / 'approval-bridge' / 'server.js').read_text(encoding='utf-8')
+assert "apiRequest('/tasks'" in approval_bridge and "pending_user_approval" in approval_bridge, 'Le pont doit créer une tâche d’approbation Spacebot par proposition.'
+assert "isApprovedTask(task)" in approval_bridge and "isRejectedTask(task)" in approval_bridge, 'Le pont doit distinguer les décisions utilisateur dans l’interface.'
+assert "task?.status === 'ready'" in approval_bridge and "applied_after_spacebot_ui_approval" in approval_bridge, 'La promotion doit suivre exclusivement l’approbation UI.'
+assert "blocked_rejected_in_spacebot_ui" in approval_bridge, 'Le rejet UI doit bloquer durablement la promotion.'
 optimizer_dockerfile = (ROOT / 'optimizer' / 'Dockerfile').read_text(encoding='utf-8')
 assert 'FROM oven/bun:1.3.4-alpine' in optimizer_dockerfile, 'L’image DSPy doit être alignée sur Bun 1.3.4.'
 
@@ -139,6 +146,9 @@ for required in [
     ROOT / 'reference-miner' / 'Dockerfile',
     ROOT / 'reference-miner' / 'server.js',
     ROOT / 'reference-miner' / 'fixtures' / 'reference_mining_policy.template.json',
+    ROOT / 'approval-bridge' / 'Dockerfile',
+    ROOT / 'approval-bridge' / 'package.json',
+    ROOT / 'approval-bridge' / 'server.js',
     ROOT / 'skills' / 'oasis-foundation' / 'SKILL.md',
     ROOT / 'skills' / 'oasis-capability-discovery' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md',
@@ -155,4 +165,4 @@ for required in [
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: pipeline borné jusqu’à proposition | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: humaine seulement | Sobriété: activée')
+print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: pipeline jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')

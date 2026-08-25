@@ -180,6 +180,7 @@ def run_optimization(max_candidates: int) -> dict[str, Any]:
         "status": "pending_approval",
         "promotion": "blocked",
         "scope": "instruction appendices only; never modifies production agents, models, tools, skills or configuration",
+        "agent_id": cases[0]["agent_id"],
         "reference_case_count": len(cases),
         "call_budget": {"planned": expected_calls, "limit": MAX_CALLS},
         "baseline": {"mean_score": baseline_mean, "results": baseline_results},
