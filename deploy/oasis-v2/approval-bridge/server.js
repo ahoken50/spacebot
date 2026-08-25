@@ -29,12 +29,15 @@ const skillTargets = {
   'oasis-governance': 'oasis-gouvernance',
   'oasis-document-studio': 'oasis-coordination',
 };
+const failureTargets = new Set(['oasis-coordination', 'oasis-finances', 'oasis-calendrier', 'oasis-pse-sig', 'oasis-reddition', 'oasis-gouvernance']);
+const approvedOverlayRoot = path.join(instanceRoot, 'approved-skill-overlays');
 
 let lastCycle = { status: 'not_started' };
 let running = false;
 
 function nowIso() { return new Date().toISOString(); }
 function safeName(value) { return String(value).replace(/[^a-zA-Z0-9._-]/g, '_'); }
+function isWithin(child, parent) { return child === parent || child.startsWith(`${parent}${path.sep}`); }
 function isApprovedTask(task) { return task?.status === 'ready'; }
 function isRejectedTask(task) { return task?.status === 'backlog'; }
 
@@ -87,8 +90,15 @@ function summarizeSkillOpt(proposal) {
     `Partitions indépendantes : apprentissage ${partitions.training ?? 0}, validation ${partitions.validation ?? 0}, contrôle final ${partitions.holdout ?? 0}.`,
   ].join(' ');
 }
+function summarizeFailureRemediation(proposal) {
+  return [
+    `Leçon de prévention ${proposal.proposal_id} issue de la tâche échouée #${proposal.source_task_number}.`,
+    `Catégorie diagnostiquée : ${proposal.failure_category ?? 'non classée'}.`,
+    `La candidate ne modifie ni MCP, ni outils, ni modèles, ni Docker, ni permissions; elle documente une conduite à tenir pour éviter une répétition identique.`,
+  ].join(' ');
+}
 function taskDescription(kind, proposal, proposalPath, proposalDir) {
-  const summary = kind === 'dspy' ? summarizeDspy(proposal) : summarizeSkillOpt(proposal);
+  const summary = kind === 'dspy' ? summarizeDspy(proposal) : kind === 'skillopt' ? summarizeSkillOpt(proposal) : summarizeFailureRemediation(proposal);
   return [
     '## Approbation finale requise',
     '',
@@ -105,6 +115,7 @@ function taskDescription(kind, proposal, proposalPath, proposalDir) {
 async function discoverProposals() {
   const dspyDirectory = path.join(optimizationRoot, 'propositions');
   const skilloptDirectory = path.join(optimizationRoot, 'skillopt', 'propositions');
+  const failureDirectory = path.join(optimizationRoot, 'failure-remediator', 'proposals');
   const proposals = [];
   for (const filename of await fs.readdir(dspyDirectory).catch(() => [])) {
     if (!filename.endsWith('.json')) continue;
@@ -122,12 +133,21 @@ async function discoverProposals() {
       proposals.push({ kind: 'skillopt', proposalPath, proposalDir, proposal });
     }
   }
+  for (const directory of await fs.readdir(failureDirectory).catch(() => [])) {
+    const proposalDir = path.join(failureDirectory, directory);
+    const proposalPath = path.join(proposalDir, 'proposal.json');
+    const proposal = await readJson(proposalPath);
+    if (proposal?.proposal_id && proposal.kind === 'failure_remediation' && proposal.status !== 'approved_promoted' && proposal.status !== 'rejected_by_user') {
+      proposals.push({ kind: 'failure_remediation', proposalPath, proposalDir, proposal });
+    }
+  }
   return proposals.sort((left, right) => String(left.proposal.created_at).localeCompare(String(right.proposal.created_at)));
 }
 
 async function createApprovalTask(record) {
   const { kind, proposal, proposalPath, proposalDir } = record;
-  const title = `${kind === 'dspy' ? 'DSPy' : 'SkillOpt'} — approbation finale : ${proposal.proposal_id}`;
+  const label = kind === 'dspy' ? 'DSPy' : kind === 'skillopt' ? 'SkillOpt' : 'Leçon après échec';
+  const title = `${label} — approbation finale : ${proposal.proposal_id}`;
   const metadata = {
     oasis_approval: {
       proposal_id: proposal.proposal_id,
@@ -168,17 +188,32 @@ async function writePromotionAudit(proposalId, payload) {
   await writeJson(path.join(promotionsRoot, `${safeName(proposalId)}.json`), payload);
 }
 
+function runtimeSkillPath(targetAgent, skillId) {
+  return path.join(instanceRoot, 'agents', targetAgent, 'workspace', 'skills', skillId, 'SKILL.md');
+}
+function overlaySkillPath(targetAgent, skillId) {
+  return path.join(approvedOverlayRoot, targetAgent, skillId, 'SKILL.md');
+}
+async function persistAndInstallSkill(targetAgent, skillId, content) {
+  const normalized = content.endsWith('\n') ? content : `${content}\n`;
+  const persistentPath = overlaySkillPath(targetAgent, skillId);
+  const runtimePath = runtimeSkillPath(targetAgent, skillId);
+  await writeTextAtomic(persistentPath, normalized);
+  await writeTextAtomic(runtimePath, normalized);
+  return { target_path: runtimePath, persistent_overlay_path: persistentPath, target_agent_id: targetAgent };
+}
+
 async function promoteDspy(record, task) {
-  const { proposal, proposalPath } = record;
+  const { proposal } = record;
   const instructions = proposal.best_candidate?.instructions;
   if (!instructions || typeof instructions !== 'object' || !Object.keys(instructions).length) {
     throw new Error('La proposition DSPy ne contient aucune instruction candidate.');
   }
   const targetAgent = String(proposal.agent_id ?? '');
   if (!dspyTargets.has(targetAgent)) throw new Error('Agent cible DSPy invalide, absent ou non autorisé.');
-  const targetPath = path.join(instanceRoot, 'agents', targetAgent, 'workspace', 'skills', 'oasis-approved-dspy-instructions', 'SKILL.md');
+  const skillId = 'oasis-approved-dspy-instructions';
   let existing = '';
-  try { existing = await fs.readFile(targetPath, 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  try { existing = await fs.readFile(overlaySkillPath(targetAgent, skillId), 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const body = [
     existing.trim(),
     `## Proposition approuvée ${proposal.proposal_id}`,
@@ -188,20 +223,54 @@ async function promoteDspy(record, task) {
     '',
     ...Object.entries(instructions).flatMap(([caseId, instruction]) => [`### Cas ${caseId}`, String(instruction).trim(), '']),
   ].filter(Boolean).join('\n');
-  await writeTextAtomic(targetPath, `${body}\n`);
-  return { target_path: targetPath, target_agent_id: targetAgent };
+  return persistAndInstallSkill(targetAgent, skillId, body);
 }
 
-async function promoteSkillOpt(record, task) {
+async function promoteSkillOpt(record) {
   const { proposal, proposalDir } = record;
   const targetAgent = skillTargets[proposal.skill_id];
   if (!targetAgent) throw new Error(`Compétence SkillOpt non autorisée pour promotion : ${proposal.skill_id}`);
   const candidatePath = path.join(proposalDir, 'candidate_SKILL.md');
   const candidate = await fs.readFile(candidatePath, 'utf8');
   if (!candidate.trim()) throw new Error('La candidate SkillOpt est vide.');
-  const targetPath = path.join(instanceRoot, 'agents', targetAgent, 'workspace', 'skills', proposal.skill_id, 'SKILL.md');
-  await writeTextAtomic(targetPath, candidate.endsWith('\n') ? candidate : `${candidate}\n`);
-  return { target_path: targetPath, target_agent_id: targetAgent, candidate_path: candidatePath };
+  const result = await persistAndInstallSkill(targetAgent, proposal.skill_id, candidate);
+  return { ...result, candidate_path: candidatePath };
+}
+
+function stripFrontmatter(candidate) {
+  return candidate.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '').trim();
+}
+async function promoteFailureRemediation(record, task) {
+  const { proposal, proposalDir } = record;
+  const targetAgent = String(proposal.target_agent_id ?? '');
+  if (!failureTargets.has(targetAgent)) throw new Error('Agent cible de la leçon invalide ou non autorisé.');
+  const constraints = proposal.constraints ?? {};
+  for (const field of ['auto_promote', 'config_change', 'model_change', 'mcp_change', 'docker_change', 'permissions_change', 'source_data_access']) {
+    if (constraints[field] !== false) throw new Error(`Contrôle de sécurité invalide pour la leçon : ${field}.`);
+  }
+  const candidatePath = path.resolve(String(proposal.candidate_path ?? ''));
+  const permittedDir = path.resolve(proposalDir);
+  if (!isWithin(candidatePath, permittedDir) || path.basename(candidatePath) !== 'candidate_SKILL.md') {
+    throw new Error('Chemin de candidate de leçon non autorisé.');
+  }
+  const candidate = await fs.readFile(candidatePath, 'utf8');
+  const lesson = stripFrontmatter(candidate);
+  if (!lesson || lesson.length > 8000) throw new Error('Leçon candidate vide ou trop volumineuse.');
+  const skillId = 'oasis-failure-lessons';
+  let existing = '';
+  try { existing = await fs.readFile(overlaySkillPath(targetAgent, skillId), 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const header = [
+    '---',
+    'name: oasis-failure-lessons',
+    'description: Leçons OASIS approuvées après des échecs de tâche. Utiliser pour éviter de répéter une erreur, un blocage ou une préparation insuffisante déjà observés.',
+    '---',
+    '',
+    '# Leçons approuvées après échec',
+  ].join('\n');
+  const body = existing.trim() || header;
+  const updated = [body, '', `## ${proposal.proposal_id}`, '', `Approuvée dans l’interface Spacebot par \`${task.approved_by ?? 'human'}\` le ${nowIso()}.`, '', lesson].join('\n');
+  const result = await persistAndInstallSkill(targetAgent, skillId, updated);
+  return { ...result, candidate_path: candidatePath, source_task_number: proposal.source_task_number };
 }
 
 async function updateTask(taskNumber, expectedRevision, status, summary) {
@@ -230,7 +299,11 @@ async function finishTask(task, summary) {
 }
 
 async function applyApprovedProposal(record, task) {
-  const result = record.kind === 'dspy' ? await promoteDspy(record, task) : await promoteSkillOpt(record, task);
+  const result = record.kind === 'dspy'
+    ? await promoteDspy(record, task)
+    : record.kind === 'skillopt'
+      ? await promoteSkillOpt(record, task)
+      : await promoteFailureRemediation(record, task);
   record.proposal.status = 'approved_promoted';
   record.proposal.promotion = 'applied_after_spacebot_ui_approval';
   record.proposal.approval_bridge = {

@@ -14,6 +14,8 @@ Cette configuration prépare une instance Spacebot destinée au suivi de la conv
 | `oasis-optimizer` | Boucle DSPy : évalue et propose des améliorations d’instructions courtes sur cas approuvés. | `instance/shared-workspace/00_systeme/optimisation/` |
 | `oasis-skillopt` | Boucle SkillOpt : apprend de façon périodique une procédure `SKILL.md` autorisée, sur partitions de test séparées. | `instance/shared-workspace/00_systeme/optimisation/skillopt/` |
 | `oasis-reference-miner` | Mineur local : extrait, dépersonnalise et dédoublonne des candidats de référence issus d’enregistrements explicitement admissibles. | `instance/shared-workspace/00_systeme/optimisation/reference-miner/` |
+| `oasis-failure-remediator` | Lit les tentatives Spacebot échouées, bloquées ou expirées; dépersonnalise et dédoublonne une leçon ou une demande de capacité candidate. | `instance/shared-workspace/00_systeme/optimisation/failure-remediator/` |
+| `oasis-approval-bridge` | Crée les tâches d’approbation dans l’interface et applique seulement les candidates explicitement approuvées. | `instance/approved-skill-overlays/` et `00_systeme/optimisation/approval-bridge/` |
 | OpenRouter | Routage des modèles de génération et création d’embeddings; les vecteurs générés sont mis en cache dans PostgreSQL. | Compte OpenRouter de la Ville |
 
 ## Profils et circulation du travail
@@ -80,7 +82,7 @@ La pile nécessite Docker Engine avec le plugin Compose. Sur la machine locale, 
 
 ```bash
 cp .env.example .env
-# Éditez .env : OPENROUTER_API_KEY et OASIS_MEMORY_DB_PASSWORD.
+# Éditez .env : OPENROUTER_API_KEY, OASIS_MEMORY_DB_PASSWORD et les quatre jetons internes requis.
 chmod 600 .env
 
 ./bootstrap_instance.sh
@@ -113,7 +115,7 @@ Le service `oasis-document-studio` donne aux agents les outils `get_document_tax
 
 ## Compétences préchargées par profil
 
-Chaque agent charge systématiquement la compétence commune `oasis-foundation`, qui impose la traçabilité, le classement, la mémoire partagée, l’approbation humaine et la sobriété des échanges. Les autres compétences sont copiées dans le workspace du profil lors de l’initialisation : le coordonnateur reçoit la coordination, les procédures financières, calendaires, PSE, de reddition, documentaires, l’optimisation DSPy, l’apprentissage SkillOpt et le minage de références; l’analyste financier reçoit finance, reddition et documents; le planificateur reçoit calendrier, reddition et documents; l’analyste PSE/SIG reçoit SIG et documents; le rédacteur reçoit reddition, documents, finances et PSE; et le secrétaire reçoit gouvernance, calendrier et documents.
+Chaque agent charge systématiquement la compétence commune `oasis-foundation`, qui impose la traçabilité, le classement, la mémoire partagée, l’approbation humaine et la sobriété des échanges. Tous reçoivent aussi `oasis-failure-learning` : elle interdit de répéter une tentative identique, impose un diagnostic court et dépersonnalisé, puis exige la vérification des compétences, outils et MCP déjà chargés. Les autres compétences sont copiées dans le workspace du profil lors de l’initialisation : le coordonnateur reçoit la coordination, les procédures financières, calendaires, PSE, de reddition, documentaires, l’optimisation DSPy, l’apprentissage SkillOpt et le minage de références; l’analyste financier reçoit finance, reddition et documents; le planificateur reçoit calendrier, reddition et documents; l’analyste PSE/SIG reçoit SIG et documents; le rédacteur reçoit reddition, documents, finances et PSE; et le secrétaire reçoit gouvernance, calendrier et documents.
 
 Cette répartition évite de charger à tous les agents des instructions inutiles tout en laissant les procédures communes disponibles. Les compétences sont uniquement des directives opératoires; les données factuelles demeurent dans le registre commun et les dossiers classés.
 
@@ -149,15 +151,25 @@ La cible est limitée aux compétences spécialisées de coordination, finances,
 
 Pour l’activer manuellement après un premier essai, copier `skillopt_reference_pack.template.json` en `skillopt_reference_pack.approved.json`, adapter les six cas de référence, faire approuver le pack et régler `autonomous_learning` à `true`. Dans la chaîne autonome, le mineur prépare ces partitions et déclenche SkillOpt lui-même. Pour mettre la boucle en pause, définir `OASIS_SKILLOPT_AUTONOMOUS_ENABLED=false`; pour désactiver complètement les outils SkillOpt, définir `OASIS_SKILLOPT_ENABLED=false`, puis relancer la pile. Les contrôles `skillopt_status`, `skillopt_validate_reference_pack`, `skillopt_learn` et `skillopt_autonomous_cycle` restent accessibles au coordonnateur seulement.
 
+## Boucle autonome après échec de tâche
+
+Lorsqu’un worker Spacebot termine avec l’issue durable `failed`, `blocked` ou `timed_out`, le service local `oasis-failure-remediator` relève uniquement le résumé court de la **dernière** tentative. Il ne lit ni transcription complète, ni document municipal source, ni secret. Il supprime localement les courriels, numéros de téléphone, montants et valeurs de jeton avant de classifier la cause probable : MCP indisponible, outil absent, compétence absente, consigne ou contexte insuffisant, délai ou portée excessive, ou échec général.
+
+Une signature dépersonnalisée de la cause est conservée dans `failure-remediator/state.json`. La première occurrence peut produire une candidate `SKILL.md` limitée à la prévention de l’erreur. La même signature ultérieure est marquée `repeat_suppressed` et ne génère ni relance identique ni nouvelle proposition. Le plafond est de trois propositions par jour par défaut; il se règle avec `OASIS_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY`. L’agent apprend donc à modifier son plan, vérifier ses préconditions et réutiliser les capacités existantes, mais jamais à contourner le problème.
+
+> Une erreur de capacité ne permet pas d’installer ou de modifier automatiquement un outil, un MCP, Docker, un modèle, une permission ou la configuration. Le système produit alors une demande de capacité à examiner, et non un changement technique. Toute candidate, y compris une simple leçon d’instruction, reste `pending_approval` jusqu’à votre décision dans l’interface.
+
+Les candidates sont déposées sous `00_systeme/optimisation/failure-remediator/proposals/` et leurs audits sous `failure-remediator/audits/`. Après approbation, la leçon est installée dans `oasis-failure-lessons` du seul profil ciblé. La tâche source ne redémarre pas automatiquement : elle demeure en échec afin que la différence de plan soit visible avant une reprise contrôlée.
+
 ## Approbation finale dans l’interface Spacebot
 
-Le service local `oasis-approval-bridge` transforme chaque proposition DSPy ou SkillOpt en une tâche Spacebot `pending_approval`, assignée au coordonnateur et visible dans la file d’approbation et les notifications de l’interface Web. La tâche présente le type de proposition, les scores, les partitions, les chemins locaux des artefacts et les consignes de revue. Le pont ne crée aucun nouveau bouton ou accès public : il s’appuie sur le mécanisme natif de tâches, de notifications et d’approbation de Spacebot.
+Le service local `oasis-approval-bridge` transforme chaque proposition DSPy, SkillOpt ou leçon issue d’un échec en une tâche Spacebot `pending_approval`, assignée au coordonnateur et visible dans la file d’approbation et les notifications de l’interface Web. La tâche présente le type de proposition, les scores ou la catégorie de diagnostic, les chemins locaux des artefacts et les consignes de revue. Le pont ne crée aucun nouveau bouton ou accès public : il s’appuie sur le mécanisme natif de tâches, de notifications et d’approbation de Spacebot.
 
-L’utilisateur ouvre la tâche, examine les artefacts avec le coordonnateur si nécessaire, puis sélectionne **Approve**. Spacebot fait passer la tâche à `ready`, enregistre l’approbateur et l’horodatage, puis le pont applique la candidate de façon contrôlée : une instruction DSPy devient une compétence locale d’instructions approuvées pour le profil ciblé; une candidate SkillOpt remplace uniquement le `SKILL.md` du profil autorisé. Il enregistre ensuite un manifeste sous `00_systeme/optimisation/approval-bridge/promotions/` et clôt la tâche. Le service ne traite pas une tâche `pending_approval`, et aucune candidature ne peut être appliquée sans le passage préalable à `ready` depuis l’interface.
+L’utilisateur ouvre la tâche, examine les artefacts avec le coordonnateur si nécessaire, puis sélectionne **Approve**. Spacebot fait passer la tâche à `ready`, enregistre l’approbateur et l’horodatage, puis le pont applique la candidate de façon contrôlée : une instruction DSPy devient une compétence locale d’instructions approuvées pour le profil ciblé; une candidate SkillOpt remplace uniquement le `SKILL.md` du profil autorisé; une candidate issue d’un échec est ajoutée à `oasis-failure-lessons` du profil ciblé après vérification stricte qu’elle ne demande aucun changement de capacité. Le pont enregistre un manifeste sous `00_systeme/optimisation/approval-bridge/promotions/`, conserve la compétence approuvée sous `instance/approved-skill-overlays/` pour qu’elle survive à `bootstrap_instance.sh`, puis clôt la tâche. Le service ne traite pas une tâche `pending_approval`, et aucune candidature ne peut être appliquée sans le passage préalable à `ready` depuis l’interface.
 
 Pour rejeter la proposition, utiliser **Dismiss** dans la file d’approbation. Spacebot replace la tâche dans `backlog`; le pont marque alors la proposition `rejected_by_user`, préserve les fichiers de revue et interdit toute promotion. Une nouvelle optimisation produit une nouvelle tâche; la proposition rejetée n’est pas réouverte silencieusement.
 
-Le pont vérifie l’état des tâches toutes les 60 secondes par défaut. Il utilise un réseau Docker interne dédié et le service Spacebot n’est le seul autre conteneur relié à ce réseau. Un jeton `OASIS_APPROVAL_BRIDGE_TOKEN` est requis pour tout déclenchement interne manuel; l’approbation elle-même se réalise exclusivement dans l’interface locale Spacebot.
+Le pont vérifie l’état des tâches toutes les 60 secondes par défaut. Le diagnostiqueur d’échec vérifie les tentatives durables toutes les 120 secondes par défaut. Ces deux services utilisent un réseau Docker interne dédié avec Spacebot; aucun des deux n’est exposé sur le réseau local. Les jetons `OASIS_APPROVAL_BRIDGE_TOKEN` et `OASIS_FAILURE_REMEDIATOR_TOKEN` sont requis pour leurs déclenchements internes manuels; l’approbation elle-même se réalise exclusivement dans l’interface locale Spacebot.
 
 ## Découverte et évolution contrôlée des capacités
 

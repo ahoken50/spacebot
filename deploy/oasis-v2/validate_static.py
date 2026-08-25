@@ -69,7 +69,7 @@ for agent in agents:
     assert tool_names == expected_agent_mcp[agent['id']], f'MCP ciblés incorrects pour {agent["id"]}: {tool_names}'
 coordination = next(agent for agent in agents if agent['id'] == 'oasis-coordination')
 assert coordination['browser']['enabled'] is True
-for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:', 'oasis-approval-bridge:'):
+for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:', 'oasis-failure-remediator:', 'oasis-approval-bridge:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
 optimizer_server = (ROOT / 'optimizer' / 'server.js').read_text(encoding='utf-8')
@@ -83,6 +83,8 @@ assert 'OASIS_REFERENCE_MINER_AUTONOMOUS_ENABLED: ${OASIS_REFERENCE_MINER_AUTONO
 assert 'OASIS_AUTONOMOUS_PIPELINE_ENABLED: ${OASIS_AUTONOMOUS_PIPELINE_ENABLED:-true}' in compose, 'Le pipeline autonome doit être activable dans Docker.'
 assert 'OASIS_AUTONOMOUS_PIPELINE_TOKEN: ${OASIS_AUTONOMOUS_PIPELINE_TOKEN:?Définir OASIS_AUTONOMOUS_PIPELINE_TOKEN dans .env}' in compose, 'Les déclenchements internes doivent être authentifiés.'
 assert 'OASIS_APPROVAL_BRIDGE_TOKEN: ${OASIS_APPROVAL_BRIDGE_TOKEN:?Définir OASIS_APPROVAL_BRIDGE_TOKEN dans .env}' in compose, 'Le pont d’approbation doit exiger un jeton local.'
+assert 'OASIS_FAILURE_REMEDIATOR_TOKEN: ${OASIS_FAILURE_REMEDIATOR_TOKEN:?Définir OASIS_FAILURE_REMEDIATOR_TOKEN dans .env}' in compose, 'Le diagnostiqueur d’échec doit exiger un jeton local.'
+assert 'OASIS_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY: ${OASIS_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY:-3}' in compose, 'La boucle d’échec doit imposer un plafond journalier.'
 reference_miner_server = (ROOT / 'reference-miner' / 'server.js').read_text(encoding='utf-8')
 assert "payload.learning_eligible === true" in reference_miner_server and "payload.completed === true" in reference_miner_server, 'Le mineur doit limiter ses sources aux tâches explicitement admissibles et terminées.'
 assert "policy.auto_promote === true" in reference_miner_server and "promotion: 'blocked_pending_approval'" in reference_miner_server, 'Le mineur ne doit jamais promouvoir un candidat automatiquement.'
@@ -108,6 +110,7 @@ for dockerfile in (
     ROOT / 'skillopt' / 'Dockerfile',
     ROOT / 'reference-miner' / 'Dockerfile',
     ROOT / 'approval-bridge' / 'Dockerfile',
+    ROOT / 'failure-remediator' / 'Dockerfile',
 ):
     dockerfile_text = dockerfile.read_text(encoding='utf-8')
     assert 'frozen-lockfile=false' not in dockerfile_text, f'Argument Bun invalide dans {dockerfile}.'
@@ -117,6 +120,14 @@ assert "apiRequest('/tasks'" in approval_bridge and "pending_user_approval" in a
 assert "isApprovedTask(task)" in approval_bridge and "isRejectedTask(task)" in approval_bridge, 'Le pont doit distinguer les décisions utilisateur dans l’interface.'
 assert "task?.status === 'ready'" in approval_bridge and "applied_after_spacebot_ui_approval" in approval_bridge, 'La promotion doit suivre exclusivement l’approbation UI.'
 assert "blocked_rejected_in_spacebot_ui" in approval_bridge, 'Le rejet UI doit bloquer durablement la promotion.'
+assert "failure_remediation" in approval_bridge and "promoteFailureRemediation" in approval_bridge, 'Le pont doit soumettre les leçons d’échec à la même approbation UI.'
+assert "approved-skill-overlays" in approval_bridge and "persistAndInstallSkill" in approval_bridge, 'Les promotions approuvées doivent survivre au bootstrap.'
+failure_remediator = (ROOT / 'failure-remediator' / 'server.js').read_text(encoding='utf-8')
+assert "'/tasks?limit=500'" in failure_remediator and '/tasks/${taskNumber}/attempts' in failure_remediator, 'La boucle doit lire les tâches et leurs tentatives Spacebot.'
+assert "missing_or_unavailable_mcp" in failure_remediator and "missing_tool" in failure_remediator and "prompt_or_context_unclear" in failure_remediator, 'Les catégories de diagnostic requises sont absentes.'
+assert "repeat_suppressed" in failure_remediator and "maxProposalsPerDay" in failure_remediator, 'La boucle doit supprimer les répétitions et appliquer un plafond.'
+assert "[courriel retiré]" in failure_remediator and "[secret retiré]" in failure_remediator, 'Les résumés d’échec doivent être dépersonnalisés.'
+assert "auto_promote: false" in failure_remediator and "mcp_change: false" in failure_remediator, 'Une leçon ne doit jamais modifier automatiquement une capacité.'
 optimizer_dockerfile = (ROOT / 'optimizer' / 'Dockerfile').read_text(encoding='utf-8')
 assert 'FROM oven/bun:1.3.4-alpine' in optimizer_dockerfile, 'L’image DSPy doit être alignée sur Bun 1.3.4.'
 
@@ -149,6 +160,11 @@ for required in [
     ROOT / 'approval-bridge' / 'Dockerfile',
     ROOT / 'approval-bridge' / 'package.json',
     ROOT / 'approval-bridge' / 'server.js',
+    ROOT / 'approval-bridge' / 'test_failure_remediation.mjs',
+    ROOT / 'failure-remediator' / 'Dockerfile',
+    ROOT / 'failure-remediator' / 'package.json',
+    ROOT / 'failure-remediator' / 'server.js',
+    ROOT / 'failure-remediator' / 'test_integration.mjs',
     ROOT / 'skills' / 'oasis-foundation' / 'SKILL.md',
     ROOT / 'skills' / 'oasis-capability-discovery' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md',
@@ -161,8 +177,9 @@ for required in [
     ROOT / 'profile-skills' / 'oasis-supervised-optimization' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-skillopt-learning' / 'SKILL.md',
     ROOT / 'profile-skills' / 'oasis-reference-case-mining' / 'SKILL.md',
+    ROOT / 'profile-skills' / 'oasis-failure-learning' / 'SKILL.md',
 ]:
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: pipeline jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')
+print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: apprentissage après échec jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')
