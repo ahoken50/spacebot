@@ -71,6 +71,10 @@ coordination = next(agent for agent in agents if agent['id'] == 'oasis-coordinat
 assert coordination['browser']['enabled'] is True
 for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'spacebot-oasis-v2:'):
     assert service in compose, f'Service Docker manquant : {service}'
+assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
+optimizer_server = (ROOT / 'optimizer' / 'server.js').read_text(encoding='utf-8')
+assert "process.env.OASIS_OPTIMIZER_ENABLED ?? 'true'" in optimizer_server, 'Le serveur DSPy doit être actif par défaut.'
+assert "confirm_approved_reference_pack: z.literal(true)" in optimizer_server, 'Une confirmation de jeu approuvé doit rester obligatoire.'
 
 for link in config['links']:
     assert link['from'] in agent_ids | human_ids and link['to'] in agent_ids | human_ids, f'Lien invalide : {link}'
@@ -105,4 +109,4 @@ for required in [
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: suggest | Taxonomie: 8 catégories | Sobriété: activée')
+print('Agents: 6 | MCP ciblés | OpenCode: activé | Routage: OpenRouter sans Claude | Autonomie: suggest | Taxonomie: 8 catégories | DSPy: actif et supervisé | Sobriété: activée')

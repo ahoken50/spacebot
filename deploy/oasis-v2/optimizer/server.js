@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile);
 const port = Number.parseInt(process.env.PORT ?? '3013', 10);
 const workspace = process.env.OASIS_WORKSPACE ?? '/data/shared-workspace';
 const optimizerPath = new URL('./optimizer.py', import.meta.url).pathname;
+const optimizerEnabled = !['0', 'false', 'no', 'off'].includes((process.env.OASIS_OPTIMIZER_ENABLED ?? 'true').trim().toLowerCase());
 
 function textResult(value) {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
@@ -33,8 +34,8 @@ function createServer() {
 
   server.registerTool(
     'optimizer_status',
-    { description: 'Consulter la présence du jeu de référence approuvé, les limites de coût et les propositions DSPy en attente. Aucun appel de modèle.', inputSchema: {} },
-    async () => textResult(await runOptimizer(['status'])),
+    { description: 'Consulter l’activation du service, la présence du jeu de référence approuvé, les limites de coût et les propositions DSPy en attente. Aucun appel de modèle.', inputSchema: {} },
+    async () => textResult({ enabled: optimizerEnabled, ...(await runOptimizer(['status'])) }),
   );
 
   server.registerTool(
@@ -43,20 +44,22 @@ function createServer() {
     async () => textResult(await runOptimizer(['validate'])),
   );
 
-  server.registerTool(
-    'optimizer_propose',
-    {
-      description: 'Exécuter une optimisation DSPy limitée sur des cas de référence approuvés. Produit seulement un candidat pending_approval dans 00_systeme/optimisation/propositions; ne modifie jamais la production.',
-      inputSchema: {
-        confirm_approved_reference_pack: z.literal(true).describe('Confirmer que le jeu de référence est approuvé, dépersonnalisé et ne contient aucune pièce municipale confidentielle.'),
-        max_candidates: z.number().int().min(1).max(2).default(1),
+  if (optimizerEnabled) {
+    server.registerTool(
+      'optimizer_propose',
+      {
+        description: 'Exécuter une optimisation DSPy limitée sur des cas de référence approuvés. Produit seulement un candidat pending_approval dans 00_systeme/optimisation/propositions; ne modifie jamais la production.',
+        inputSchema: {
+          confirm_approved_reference_pack: z.literal(true).describe('Confirmer que le jeu de référence est approuvé, dépersonnalisé et ne contient aucune pièce municipale confidentielle.'),
+          max_candidates: z.number().int().min(1).max(2).default(1),
+        },
       },
-    },
-    async ({ max_candidates }) => {
-      const result = await runOptimizer(['optimize', '--max-candidates', String(max_candidates)]);
-      return textResult(result);
-    },
-  );
+      async ({ max_candidates }) => {
+        const result = await runOptimizer(['optimize', '--max-candidates', String(max_candidates)]);
+        return textResult(result);
+      },
+    );
+  }
 
   return server;
 }
@@ -68,5 +71,5 @@ app.post('/mcp', async (req, res) => {
   await server.connect(transport);
   await transport.handleRequest(req, res, req.body);
 });
-app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok', service: 'oasis-supervised-optimizer' }));
+app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok', service: 'oasis-supervised-optimizer', enabled: optimizerEnabled }));
 app.listen(port, '0.0.0.0', () => console.log(`oasis-supervised-optimizer listening on ${port}`));

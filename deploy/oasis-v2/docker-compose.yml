@@ -103,6 +103,9 @@ services:
     environment:
       PORT: "3013"
       OASIS_WORKSPACE: /workspace
+      # Le service et l’outil DSPy sont actifs au démarrage; aucun appel LLM n’est déclenché automatiquement.
+      # Mettre false masque seulement optimizer_propose, sans arrêter les contrôles de statut et de validation.
+      OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}
       OASIS_OPTIMIZER_MODEL: ${OASIS_OPTIMIZER_MODEL:-openrouter/qwen/qwen3.7-flash}
       OASIS_OPTIMIZER_MAX_CASES: ${OASIS_OPTIMIZER_MAX_CASES:-2}
       OASIS_OPTIMIZER_MAX_CANDIDATES: ${OASIS_OPTIMIZER_MAX_CANDIDATES:-1}
