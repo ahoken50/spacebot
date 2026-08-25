@@ -26,8 +26,6 @@ services:
     image: oasis-shared-memory:local
     container_name: oasis-shared-memory
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       PORT: "3010"
       DATABASE_URL: postgresql://oasis_memory:${OASIS_MEMORY_DB_PASSWORD:?Définir OASIS_MEMORY_DB_PASSWORD dans .env}@oasis-memory-db:5432/oasis_shared_memory
@@ -40,6 +38,10 @@ services:
         condition: service_healthy
     expose:
       - "3010"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3010/health').then(r => { if (!r.ok) process.exit(1) })"]
       interval: 30s
@@ -62,6 +64,10 @@ services:
       - ./instance/shared-workspace:/workspace:rw
     expose:
       - "3011"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3011/health').then(r => { if (!r.ok) process.exit(1) })"]
       interval: 30s
@@ -84,6 +90,10 @@ services:
       - ./instance/shared-workspace:/workspace:rw
     expose:
       - "3012"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3012/health').then(r => { if (!r.ok) process.exit(1) })"]
       interval: 30s
@@ -99,14 +109,13 @@ services:
     image: oasis-supervised-optimizer:local
     container_name: oasis-optimizer
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       PORT: "3013"
       OASIS_WORKSPACE: /workspace
       # Le service et l’outil DSPy sont actifs au démarrage; aucun appel LLM n’est déclenché automatiquement.
       # Mettre false masque seulement optimizer_propose, sans arrêter les contrôles de statut et de validation.
       OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
       OASIS_OPTIMIZER_MODEL: ${OASIS_OPTIMIZER_MODEL:-openrouter/qwen/qwen3.7-flash}
       OASIS_OPTIMIZER_MAX_CASES: ${OASIS_OPTIMIZER_MAX_CASES:-2}
       OASIS_OPTIMIZER_MAX_CANDIDATES: ${OASIS_OPTIMIZER_MAX_CANDIDATES:-1}
@@ -135,8 +144,6 @@ services:
     image: oasis-skillopt:local
     container_name: oasis-skillopt
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       PORT: "3014"
       OASIS_WORKSPACE: /workspace
@@ -181,8 +188,6 @@ services:
     image: oasis-reference-miner:local
     container_name: oasis-reference-miner
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       PORT: "3015"
       OASIS_WORKSPACE: /workspace
@@ -229,14 +234,14 @@ services:
       dockerfile: Dockerfile
     container_name: spacebot-oasis-v2
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       SPACEBOT_DIR: /data
       SPACEBOT_DEPLOYMENT: docker
       SPACEBOT_CRON_TIMEZONE: America/Toronto
       SPACEBOT_USER_TIMEZONE: America/Toronto
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+      OASIS_SKILL_INSTALL_REQUIRE_APPROVAL: "true"
+      OASIS_SKILL_APPROVAL_DIR: /data/skill-install-authorizations
       OPENCODE_DISABLE_AUTOUPDATE: "true"
       OPENCODE_DISABLE_LSP_DOWNLOAD: "true"
     ports:

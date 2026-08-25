@@ -31,6 +31,7 @@ const skillTargets = {
 };
 const failureTargets = new Set(['oasis-coordination', 'oasis-finances', 'oasis-calendrier', 'oasis-pse-sig', 'oasis-reddition', 'oasis-gouvernance']);
 const approvedOverlayRoot = path.join(instanceRoot, 'approved-skill-overlays');
+const skillInstallAuthorizationRoot = path.join(instanceRoot, 'skill-install-authorizations');
 
 let lastCycle = { status: 'not_started' };
 let running = false;
@@ -304,6 +305,10 @@ async function promoteFailureRemediation(record, task) {
   return { ...result, candidate_path: candidatePath, source_task_number: proposal.source_task_number };
 }
 
+function capabilityAuthorizationPath(proposalId) {
+  return path.join(skillInstallAuthorizationRoot, `${safeName(proposalId)}.json`);
+}
+
 async function authorizeCapabilitySkill(record, task) {
   const { proposal } = record;
   const targetAgent = String(proposal.target_agent_id ?? '');
@@ -323,12 +328,26 @@ async function authorizeCapabilitySkill(record, task) {
     target_agent_id: targetAgent, skill_source: source,
   };
   await writeJson(record.proposalPath, proposal);
+  const authorizationPath = capabilityAuthorizationPath(proposal.proposal_id);
+  await writeJson(authorizationPath, {
+    schema_version: 1,
+    kind: 'capability_skill_install_authorization',
+    status: 'approved_for_agent_install',
+    proposal_id: proposal.proposal_id,
+    task_number: task.task_number,
+    target_agent_id: targetAgent,
+    skill_source: source,
+    workspace_skill_only: true,
+    approved_by: task.approved_by ?? 'human',
+    approved_at: task.approved_at ?? nowIso(),
+    authorized_at: nowIso(),
+  });
   await writePromotionAudit(proposal.proposal_id, {
     proposal_id: proposal.proposal_id, kind: record.kind, task_number: task.task_number,
     approved_by: task.approved_by ?? 'human', authorized_at: nowIso(), target_agent_id: targetAgent,
-    skill_source: source, promotion: 'approved_install_authorization_only',
+    skill_source: source, authorization_path: authorizationPath, promotion: 'approved_install_authorization_only',
   });
-  return { target_agent_id: targetAgent, skill_source: source, authorization: 'agent_must_call_install_skill_in_own_workspace' };
+  return { target_agent_id: targetAgent, skill_source: source, authorization_path: authorizationPath, authorization: 'agent_must_call_install_skill_in_own_workspace' };
 }
 
 async function updateTask(taskNumber, expectedRevision, status, summary) {

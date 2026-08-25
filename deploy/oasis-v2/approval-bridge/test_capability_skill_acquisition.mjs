@@ -117,6 +117,13 @@ try {
 
   const proposal = JSON.parse(await readFile(proposalPath, 'utf8'));
   assert.equal(proposal.status, 'approved_for_agent_install');
+  const authorizationPath = path.join(instanceRoot, 'skill-install-authorizations', `${proposalId}.json`);
+  const authorization = JSON.parse(await readFile(authorizationPath, 'utf8'));
+  assert.equal(authorization.kind, 'capability_skill_install_authorization');
+  assert.equal(authorization.status, 'approved_for_agent_install');
+  assert.equal(authorization.target_agent_id, 'oasis-finances');
+  assert.equal(authorization.skill_source, 'example-org/finance-skill');
+  assert.equal(authorization.workspace_skill_only, true);
   await assert.rejects(readFile(path.join(instanceRoot, 'agents', 'oasis-finances', 'workspace', 'skills', 'finance-skill', 'SKILL.md')));
   console.log('Test d’intégration approval-bridge / capacité skill : OK');
 } finally {

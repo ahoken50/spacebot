@@ -19,7 +19,8 @@ assert len(agents) == 6, 'Six profils OASIS sont requis.'
 assert len(agent_ids) == len(agents), 'Les IDs des agents doivent être uniques.'
 assert sum(bool(agent.get('default')) for agent in agents) == 1, 'Un seul agent par défaut est requis.'
 assert all(re.fullmatch(r'[a-z0-9_-]+', agent_id) for agent_id in agent_ids), 'ID agent invalide.'
-assert all(agent['workspace'] == '/data/shared-workspace' for agent in agents), 'Workspace commun OASIS attendu.'
+assert all('workspace' not in agent for agent in agents), 'Chaque profil doit utiliser son workspace privé par défaut.'
+assert all(agent.get('sandbox', {}).get('writable_paths') == ['/data/shared-workspace'] for agent in agents), 'Chaque profil doit recevoir seulement l’accès documentaire partagé requis.'
 
 routing = config['defaults']['routing']
 for field in ('channel', 'branch', 'worker', 'compactor', 'cortex'):
@@ -87,6 +88,10 @@ assert 'OASIS_AUTONOMOUS_PIPELINE_TOKEN: ${OASIS_AUTONOMOUS_PIPELINE_TOKEN:?Déf
 assert 'OASIS_APPROVAL_BRIDGE_TOKEN: ${OASIS_APPROVAL_BRIDGE_TOKEN:?Définir OASIS_APPROVAL_BRIDGE_TOKEN dans .env}' in compose, 'Le pont d’approbation doit exiger un jeton local.'
 assert 'OASIS_FAILURE_REMEDIATOR_TOKEN: ${OASIS_FAILURE_REMEDIATOR_TOKEN:?Définir OASIS_FAILURE_REMEDIATOR_TOKEN dans .env}' in compose, 'Le diagnostiqueur d’échec doit exiger un jeton local.'
 assert 'OASIS_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY: ${OASIS_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY:-3}' in compose, 'La boucle d’échec doit imposer un plafond journalier.'
+assert 'env_file:' not in compose, 'Les services OASIS doivent recevoir seulement les secrets explicitement requis.'
+assert 'OASIS_SKILL_INSTALL_REQUIRE_APPROVAL: "true"' in compose, 'L’installation externe de compétences doit exiger une autorisation OASIS.'
+assert 'OASIS_SKILL_APPROVAL_DIR: /data/skill-install-authorizations' in compose, 'Le verrou d’installation doit lire les autorisations persistantes hors du workspace agent.'
+assert 'OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}' in compose, 'Les services qui appellent OpenRouter doivent recevoir la clé explicitement.'
 reference_miner_server = (ROOT / 'reference-miner' / 'server.js').read_text(encoding='utf-8')
 assert "payload.learning_eligible === true" in reference_miner_server and "payload.completed === true" in reference_miner_server, 'Le mineur doit limiter ses sources aux tâches explicitement admissibles et terminées.'
 assert "policy.auto_promote === true" in reference_miner_server and "promotion: 'blocked_pending_approval'" in reference_miner_server, 'Le mineur ne doit jamais promouvoir un candidat automatiquement.'
@@ -117,6 +122,10 @@ for dockerfile in (
     dockerfile_text = dockerfile.read_text(encoding='utf-8')
     assert 'frozen-lockfile=false' not in dockerfile_text, f'Argument Bun invalide dans {dockerfile}.'
     assert 'bun install --production' in dockerfile_text, f'Installation Bun de production attendue dans {dockerfile}.'
+install_skill_tool = (ROOT / '..' / '..' / 'src' / 'tools' / 'install_skill.rs').resolve().read_text(encoding='utf-8')
+assert 'OASIS_SKILL_INSTALL_REQUIRE_APPROVAL' in install_skill_tool and 'approved_for_agent_install' in install_skill_tool, 'Le moteur doit bloquer install_skill sans autorisation OASIS explicite.'
+assert 'skill-install-authorizations' in install_skill_tool and 'capability_skill_install_authorization' in install_skill_tool, 'Le verrou doit lire seulement les autorisations réservées hors du workspace agent.'
+assert 'proposal.get("skill_source")' in install_skill_tool and 'proposal.get("target_agent_id")' in install_skill_tool, 'Le verrou doit associer précisément source et agent autorisés.'
 approval_bridge = (ROOT / 'approval-bridge' / 'server.js').read_text(encoding='utf-8')
 assert "apiRequest('/tasks'" in approval_bridge and "pending_user_approval" in approval_bridge, 'Le pont doit créer une tâche d’approbation Spacebot par proposition.'
 assert "isApprovedTask(task)" in approval_bridge and "isRejectedTask(task)" in approval_bridge, 'Le pont doit distinguer les décisions utilisateur dans l’interface.'
@@ -125,6 +134,7 @@ assert "blocked_rejected_in_spacebot_ui" in approval_bridge, 'Le rejet UI doit b
 assert "failure_remediation" in approval_bridge and "promoteFailureRemediation" in approval_bridge, 'Le pont doit soumettre les leçons d’échec à la même approbation UI.'
 assert "approved-skill-overlays" in approval_bridge and "persistAndInstallSkill" in approval_bridge, 'Les promotions approuvées doivent survivre au bootstrap.'
 assert "capability_skill_acquisition" in approval_bridge and "authorizeCapabilitySkill" in approval_bridge, 'Le pont doit soumettre les compétences externes à l’approbation UI.'
+assert "skill-install-authorizations" in approval_bridge and "capability_skill_install_authorization" in approval_bridge, 'Le pont doit déposer une autorisation réservée hors du workspace agent.'
 assert "approved_for_agent_install" in approval_bridge and "workspace_skill_only" in approval_bridge, 'Une compétence externe approuvée doit rester limitée au workspace.'
 failure_remediator = (ROOT / 'failure-remediator' / 'server.js').read_text(encoding='utf-8')
 assert "'/tasks?limit=500'" in failure_remediator and '/tasks/${taskNumber}/attempts' in failure_remediator, 'La boucle doit lire les tâches et leurs tentatives Spacebot.'
@@ -144,6 +154,8 @@ assert python_skill.is_file() and python_scaffold.is_file(), 'La compétence Pyt
 assert 'python3 -m py_compile' in python_skill.read_text(encoding='utf-8'), 'La compétence Python doit exiger une compilation de contrôle.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
 assert bootstrap.count('oasis-python-workbench') == 6, 'La compétence Python doit être préchargée pour les six profils.'
+assert 'workspace/skills' in bootstrap and 'approved-skill-overlays' in bootstrap, 'Les compétences de profil et recouvrements approuvés doivent être préparés dans les workspaces privés.'
+assert 'skill-install-authorizations' in bootstrap, 'Le bootstrap doit préparer la zone réservée aux autorisations de compétences.'
 assert '00_systeme/scripts' in bootstrap, 'Le répertoire de scripts OASIS doit être initialisé.'
 optimizer_dockerfile = (ROOT / 'optimizer' / 'Dockerfile').read_text(encoding='utf-8')
 assert 'FROM oven/bun:1.3.4-alpine' in optimizer_dockerfile, 'L’image DSPy doit être alignée sur Bun 1.3.4.'
@@ -203,4 +215,4 @@ for required in [
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | MCP ciblés | OpenCode/Python: activés | Routage: OpenRouter sans Claude | Autonomie: apprentissage et acquisition de compétences jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')
+print('Agents: 6 | Workspaces privés + données partagées sandboxées | Secrets par moindre privilège | MCP ciblés | OpenCode/Python: activés | Routage: OpenRouter sans Claude | Autonomie: apprentissage et acquisition de compétences jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')

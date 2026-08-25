@@ -21,6 +21,7 @@ mkdir -p "${INSTANCE_DIR}/agents" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/failure-remediator/proposals" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/failure-remediator/audits" \
   "${INSTANCE_DIR}/approved-skill-overlays" \
+  "${INSTANCE_DIR}/skill-install-authorizations" \
   "${SHARED_WORKSPACE}/01_sources/00_inbox" \
   "${SHARED_WORKSPACE}/01_sources/01_convention" \
   "${SHARED_WORKSPACE}/01_sources/02_budget_depenses" \
@@ -186,7 +187,7 @@ Le mineur de références ne lit que les enregistrements partagés `approved`, `
 
 La boucle de remédiation lit uniquement les tâches Spacebot à l’état `failed` et leurs résumés de tentatives durables. Elle dépersonnalise le diagnostic, supprime les répétitions et crée une leçon candidate dans `00_systeme/optimisation/failure-remediator/proposals/`. Toute leçon reste bloquée jusqu’à **Approve** dans l’interface; les audits sont dans `failure-remediator/audits/`. Les compétences approuvées sont conservées dans `instance/approved-skill-overlays/` et réinstallées à chaque bootstrap.
 
-Les scripts Python créés par les profils vont dans `00_systeme/scripts/<agent-id>/`. Ils doivent être accompagnés d’un README, rester dans le workspace, être compilés avec `python3 -m py_compile` et ne pas introduire de dépendance sans approbation. Les agents peuvent rechercher les compétences manquantes avec l’outil natif `skills_search`, mais une installation externe ou une capacité partagée suit la revue indiquée dans `00_systeme/propositions_capacites/`.
+Les scripts Python créés par les profils vont dans `00_systeme/scripts/<agent-id>/`. Ils doivent être accompagnés d’un README, rester dans le workspace, être compilés avec `python3 -m py_compile` et ne pas introduire de dépendance sans approbation. Les agents peuvent rechercher les compétences manquantes avec l’outil natif `skills_search`, mais une installation externe ou une capacité partagée suit la revue indiquée dans `00_systeme/propositions_capacites/`. Après l’approbation UI, le pont dépose l’autorisation de téléchargement hors du workspace agent, sous `instance/skill-install-authorizations/`.
 EOF
 
 cat > "${INSTANCE_DIR}/README-local.md" <<'EOF'

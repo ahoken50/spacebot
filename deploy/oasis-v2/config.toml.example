@@ -126,9 +126,11 @@ id = "oasis-coordination"
 display_name = "Coordonnateur OASIS-V2"
 role = "Point d’entrée Web, planification, délégation, consolidation et demande d’approbation."
 default = true
-workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
 
 [agents.browser]
 enabled = true
@@ -164,9 +166,11 @@ url = "http://oasis-reference-miner:3015/mcp"
 id = "oasis-finances"
 display_name = "Analyste financier OASIS-V2"
 role = "Suivi du budget, dépenses, salaires, contrats, appels d’offres, admissibilité et rapprochements."
-workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
 
 [[agents.mcp]]
 name = "oasis_document_studio"
@@ -177,9 +181,11 @@ url = "http://oasis-document-studio:3012/mcp"
 id = "oasis-calendrier"
 display_name = "Planificateur OASIS-V2"
 role = "Calendrier compressé, Gantt, jalons contractuels, dépendances et contrôle des écarts."
-workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
 
 [[agents.mcp]]
 name = "oasis_document_studio"
@@ -190,9 +196,11 @@ url = "http://oasis-document-studio:3012/mcp"
 id = "oasis-pse-sig"
 display_name = "Analyste PSE et SIG OASIS-V2"
 role = "Plan de suivi et d’évaluation, KML, superficies, indicateurs, vulnérabilité et validation méthodologique."
-workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
 
 [[agents.mcp]]
 name = "oasis_gis_local"
@@ -208,9 +216,11 @@ url = "http://oasis-document-studio:3012/mcp"
 id = "oasis-reddition"
 display_name = "Rédacteur de reddition OASIS-V2"
 role = "Rapports d’étape, rapport final, liste des annexes, conformité des livrables et contrôle de qualité rédactionnel."
-workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
 
 [[agents.mcp]]
 name = "oasis_document_studio"
@@ -221,9 +231,11 @@ url = "http://oasis-document-studio:3012/mcp"
 id = "oasis-gouvernance"
 display_name = "Secrétaire du comité de suivi OASIS-V2"
 role = "Comité de suivi, convocations, ordres du jour, procès-verbaux, décisions, responsables, risques et relances."
-workspace = "/data/shared-workspace"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
 
 [[agents.mcp]]
 name = "oasis_document_studio"
