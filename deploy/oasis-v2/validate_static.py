@@ -175,7 +175,11 @@ for expected_tool in (
     'oasis_skillopt_skillopt_status', 'oasis_reference_miner_reference_miner_status',
 ):
     assert expected_tool in skill_texts, f'Outil MCP préfixé absent des compétences : {expected_tool}'
-assert 'chemins **relatifs**' in skill_texts and '/data/shared-workspace/...' in skill_texts, 'Les compétences documentaires doivent exiger des chemins relatifs.'
+assert '/data/shared-workspace/<chemin-relatif>' in skill_texts, 'Les compétences doivent distinguer le chemin absolu File du chemin relatif du studio documentaire.'
+coordination_skill = (ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md').read_text(encoding='utf-8')
+assert 'sans déléguer' in coordination_skill and 'ne pas appeler l’outil de délégation' in coordination_skill, 'Le coordonnateur doit respecter une consigne explicite de non-délégation.'
+assert '/data/shared-workspace/01_sources/00_inbox' in coordination_skill, 'Le coordonnateur doit lire l’inbox depuis l’espace partagé, jamais son workspace privé.'
+assert 'oasis_shared_memory_search_shared_memory' in coordination_skill, 'Le flux direct doit interroger la mémoire avec le nom MCP préfixé.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
 assert bootstrap.count('oasis-python-workbench') == 6, 'La compétence Python doit être préchargée pour les six profils.'
 assert 'workspace/skills' in bootstrap and 'approved-skill-overlays' in bootstrap, 'Les compétences de profil et recouvrements approuvés doivent être préparés dans les workspaces privés.'
