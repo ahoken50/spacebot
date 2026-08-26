@@ -73,7 +73,9 @@ for agent in agents:
 coordination = next(agent for agent in agents if agent['id'] == 'oasis-coordination')
 assert coordination['browser']['enabled'] is True
 assert '- SYS_ADMIN' in compose, 'Bubblewrap nécessite SYS_ADMIN pour créer son espace de montage isolé.'
+assert '- seccomp=unconfined' in compose and '- apparmor=unconfined' in compose, 'Bubblewrap doit pouvoir effectuer ses montages de namespace dans le conteneur principal.'
 assert 'no-new-privileges:true' in compose and 'cap_drop:\n      - ALL' in compose, 'Le conteneur principal doit conserver no-new-privileges et supprimer les capacités non requises.'
+assert 'docker.sock' not in compose and './instance:/data' in compose, 'Le moteur OASIS ne doit monter que son instance locale, jamais le socket Docker.'
 for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:', 'oasis-failure-remediator:', 'oasis-approval-bridge:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'

@@ -264,7 +264,12 @@ services:
       oasis-reference-miner:
         condition: service_healthy
     security_opt:
+      # Bubblewrap doit appeler mount(2) dans un namespace privé. Les profils Docker
+      # seccomp et AppArmor par défaut l’interdisent même avec CAP_SYS_ADMIN.
+      # Le conteneur reste sans socket Docker, sans volume hôte additionnel et avec cap_drop ALL.
       - no-new-privileges:true
+      - seccomp=unconfined
+      - apparmor=unconfined
     cap_drop:
       - ALL
     cap_add:
