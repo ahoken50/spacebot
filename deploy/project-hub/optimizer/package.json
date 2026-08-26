@@ -1,0 +1,14 @@
+{
+  "name": "project-supervised-optimizer-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Boucle locale d’évaluation et de proposition DSPy sous approbation humaine pour Spacebot Project Hub.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "4.4.3"
+  }
+}

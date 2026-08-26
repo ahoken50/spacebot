@@ -1,0 +1,9 @@
+{
+  "name": "project-failure-remediator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

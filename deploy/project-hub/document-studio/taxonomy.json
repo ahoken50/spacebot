@@ -1,0 +1,88 @@
+{
+  "version": "1.0",
+  "root": "/workspace",
+  "principles": [
+    "Conserver les documents originaux sans modification.",
+    "Classer toute nouvelle pièce à partir de 01_sources/00_inbox.",
+    "Conserver séparément les brouillons, les révisions, les versions approuvées et les transmissions.",
+    "Enregistrer le chemin final, le statut et les sources dans la mémoire partagée."
+  ],
+  "categories": {
+    "source": {
+      "label": "Sources, cadre et données d’entrée",
+      "folders": [
+        "01_sources/00_inbox",
+        "01_sources/01_cadre_reference",
+        "01_sources/02_donnees_et_resultats",
+        "01_sources/03_documents_administratifs",
+        "01_sources/04_donnees_geospatiales"
+      ]
+    },
+    "finance": {
+      "label": "Finances et administration",
+      "folders": [
+        "02_finances/01_budget",
+        "02_finances/02_engagements",
+        "02_finances/03_depenses",
+        "02_finances/04_contrats_approvisionnement",
+        "02_finances/05_controles_ecarts"
+      ]
+    },
+    "planning": {
+      "label": "Planification et risques",
+      "folders": [
+        "03_planification/01_cadre_approuve",
+        "03_planification/02_plan_travail",
+        "03_planification/03_gantt",
+        "03_planification/04_jalons_risques"
+      ]
+    },
+    "analysis": {
+      "label": "Analyses, méthodes et données géospatiales",
+      "folders": [
+        "04_analyse/01_methodes",
+        "04_analyse/02_donnees",
+        "04_analyse/03_geospatiale",
+        "04_analyse/04_indicateurs",
+        "04_analyse/05_calculs_reproductibles"
+      ]
+    },
+    "governance": {
+      "label": "Gouvernance et parties prenantes",
+      "folders": [
+        "05_gouvernance/01_mandat_parties_prenantes",
+        "05_gouvernance/02_convocations",
+        "05_gouvernance/03_ordres_du_jour",
+        "05_gouvernance/04_proces_verbaux",
+        "05_gouvernance/05_decisions_actions_risques"
+      ]
+    },
+    "reporting": {
+      "label": "Rapports et synthèses",
+      "folders": [
+        "06_rapports_et_syntheses/01_notes",
+        "06_rapports_et_syntheses/02_rapports_intermediaires",
+        "06_rapports_et_syntheses/03_rapport_final",
+        "06_rapports_et_syntheses/04_annexes_preuves"
+      ]
+    },
+    "deliverable": {
+      "label": "Livrables produits",
+      "folders": [
+        "07_livrables/00_reference",
+        "07_livrables/01_brouillons",
+        "07_livrables/02_revue_qualite",
+        "07_livrables/03_approuves",
+        "07_livrables/04_transmis"
+      ]
+    },
+    "archive": {
+      "label": "Archives et versions remplacées",
+      "folders": [
+        "08_archives/01_versions_remplacees",
+        "08_archives/02_non_admissibles",
+        "08_archives/03_exports_journaux"
+      ]
+    }
+  }
+}

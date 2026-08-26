@@ -39,7 +39,7 @@ impl InstallSkillTool {
 
 fn approval_required() -> bool {
     matches!(
-        std::env::var("OASIS_SKILL_INSTALL_REQUIRE_APPROVAL").as_deref(),
+        std::env::var("PROJECT_HUB_SKILL_INSTALL_REQUIRE_APPROVAL").as_deref(),
         Ok("1") | Ok("true") | Ok("TRUE") | Ok("yes") | Ok("YES")
     )
 }
@@ -55,7 +55,7 @@ fn target_agent_id(config: &RuntimeConfig) -> Result<String, InstallSkillError> 
 }
 
 fn approval_directory(config: &RuntimeConfig) -> PathBuf {
-    std::env::var_os("OASIS_SKILL_APPROVAL_DIR")
+    std::env::var_os("PROJECT_HUB_SKILL_APPROVAL_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             config
@@ -73,21 +73,21 @@ fn installation_is_authorized(config: &RuntimeConfig, source: &str) -> Result<()
     let directory = approval_directory(config);
     let entries = std::fs::read_dir(&directory).map_err(|error| {
         InstallSkillError(format!(
-            "OASIS requires a Spacebot approval before installing skills; cannot read {}: {error}",
+            "Project Hub requires a Spacebot approval before installing skills; cannot read {}: {error}",
             directory.display()
         ))
     })?;
 
     for entry in entries {
-        let entry = entry.map_err(|error| InstallSkillError(format!("cannot read OASIS approval entry: {error}")))?;
+        let entry = entry.map_err(|error| InstallSkillError(format!("cannot read Project Hub approval entry: {error}")))?;
         let path = entry.path();
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
         }
         let raw = std::fs::read_to_string(&path)
-            .map_err(|error| InstallSkillError(format!("cannot read OASIS approval {}: {error}", path.display())))?;
+            .map_err(|error| InstallSkillError(format!("cannot read Project Hub approval {}: {error}", path.display())))?;
         let proposal: serde_json::Value = serde_json::from_str(&raw)
-            .map_err(|error| InstallSkillError(format!("invalid OASIS approval {}: {error}", path.display())))?;
+            .map_err(|error| InstallSkillError(format!("invalid Project Hub approval {}: {error}", path.display())))?;
         let authorized = proposal.get("kind").and_then(|value| value.as_str()) == Some("capability_skill_install_authorization")
             && proposal.get("status").and_then(|value| value.as_str()) == Some("approved_for_agent_install")
             && proposal.get("target_agent_id").and_then(|value| value.as_str()) == Some(agent_id.as_str())
@@ -99,7 +99,7 @@ fn installation_is_authorized(config: &RuntimeConfig, source: &str) -> Result<()
     }
 
     Err(InstallSkillError(format!(
-        "OASIS requires a Spacebot-approved capability request before installing '{source}' for agent '{agent_id}'"
+        "Project Hub requires a Spacebot-approved capability request before installing '{source}' for agent '{agent_id}'"
     )))
 }
 

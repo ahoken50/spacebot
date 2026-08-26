@@ -1,0 +1,357 @@
+services:
+  project-memory-db:
+    image: pgvector/pgvector:pg16
+    container_name: project-memory-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: project_hub_shared_memory
+      POSTGRES_USER: project_hub_memory
+      POSTGRES_PASSWORD: ${PROJECT_HUB_MEMORY_DB_PASSWORD:?Définir PROJECT_HUB_MEMORY_DB_PASSWORD dans .env}
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U project_hub_memory -d project_hub_shared_memory"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - project_hub_internal
+
+  project-shared-memory:
+    build:
+      context: ./shared-memory
+    image: project-shared-memory:local
+    container_name: project-shared-memory
+    restart: unless-stopped
+    environment:
+      PORT: "3010"
+      DATABASE_URL: postgresql://project_hub_memory:${PROJECT_HUB_MEMORY_DB_PASSWORD:?Définir PROJECT_HUB_MEMORY_DB_PASSWORD dans .env}@project-memory-db:5432/project_hub_shared_memory
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+      PROJECT_HUB_EMBEDDING_MODEL: ${PROJECT_HUB_EMBEDDING_MODEL:-qwen/qwen3-embedding-0.6b}
+      PROJECT_HUB_EMBEDDING_DIMENSIONS: ${PROJECT_HUB_EMBEDDING_DIMENSIONS:-1024}
+      PROJECT_HUB_MEMORY_EXPORT_TOKEN: ${PROJECT_HUB_MEMORY_EXPORT_TOKEN:?Définir PROJECT_HUB_MEMORY_EXPORT_TOKEN dans .env}
+    depends_on:
+      project-memory-db:
+        condition: service_healthy
+    expose:
+      - "3010"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3010/health').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - project_hub_internal
+
+  project-gis:
+    build:
+      context: ./gis-mcp
+    image: project-gis-mcp:local
+    container_name: project-gis
+    restart: unless-stopped
+    environment:
+      PORT: "3011"
+      PROJECT_HUB_GIS_WORKSPACE: /workspace
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    expose:
+      - "3011"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3011/health').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - project_hub_internal
+
+  project-document-studio:
+    build:
+      context: ./document-studio
+    image: project-document-studio:local
+    container_name: project-document-studio
+    restart: unless-stopped
+    environment:
+      PORT: "3012"
+      PROJECT_HUB_DOCUMENT_WORKSPACE: /workspace
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    expose:
+      - "3012"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3012/health').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - project_hub_internal
+
+  project-optimizer:
+    build:
+      context: ./optimizer
+    image: project-supervised-optimizer:local
+    container_name: project-optimizer
+    restart: unless-stopped
+    environment:
+      PORT: "3013"
+      PROJECT_HUB_WORKSPACE: /workspace
+      # Le service et l’outil DSPy sont actifs au démarrage; aucun appel LLM n’est déclenché automatiquement.
+      # Mettre false masque seulement optimizer_propose, sans arrêter les contrôles de statut et de validation.
+      PROJECT_HUB_OPTIMIZER_ENABLED: ${PROJECT_HUB_OPTIMIZER_ENABLED:-true}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+      PROJECT_HUB_OPTIMIZER_MODEL: ${PROJECT_HUB_OPTIMIZER_MODEL:-openrouter/qwen/qwen3.7-flash}
+      PROJECT_HUB_OPTIMIZER_MAX_CASES: ${PROJECT_HUB_OPTIMIZER_MAX_CASES:-2}
+      PROJECT_HUB_OPTIMIZER_MAX_CANDIDATES: ${PROJECT_HUB_OPTIMIZER_MAX_CANDIDATES:-1}
+      PROJECT_HUB_OPTIMIZER_MAX_CALLS: ${PROJECT_HUB_OPTIMIZER_MAX_CALLS:-8}
+      PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN: ${PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN:?Définir PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN dans .env}
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    expose:
+      - "3013"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3013/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - project_hub_internal
+
+  project-skillopt:
+    build:
+      context: ./skillopt
+    image: project-skillopt:local
+    container_name: project-skillopt
+    restart: unless-stopped
+    environment:
+      PORT: "3014"
+      PROJECT_HUB_WORKSPACE: /workspace
+      PROJECT_HUB_SKILLOPT_SKILL_CATALOG: /skill-catalog
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+      # SkillOpt apprend des compétences approbées dans des cas dépersonnalisés. Les changements restent pending_approval.
+      PROJECT_HUB_SKILLOPT_ENABLED: ${PROJECT_HUB_SKILLOPT_ENABLED:-true}
+      PROJECT_HUB_SKILLOPT_AUTONOMOUS_ENABLED: ${PROJECT_HUB_SKILLOPT_AUTONOMOUS_ENABLED:-true}
+      PROJECT_HUB_SKILLOPT_INTERVAL_HOURS: ${PROJECT_HUB_SKILLOPT_INTERVAL_HOURS:-24}
+      PROJECT_HUB_SKILLOPT_MAX_TRAIN_CASES: ${PROJECT_HUB_SKILLOPT_MAX_TRAIN_CASES:-2}
+      PROJECT_HUB_SKILLOPT_MAX_VALIDATION_CASES: ${PROJECT_HUB_SKILLOPT_MAX_VALIDATION_CASES:-2}
+      PROJECT_HUB_SKILLOPT_MAX_HOLDOUT_CASES: ${PROJECT_HUB_SKILLOPT_MAX_HOLDOUT_CASES:-2}
+      PROJECT_HUB_SKILLOPT_MAX_EPOCHS: ${PROJECT_HUB_SKILLOPT_MAX_EPOCHS:-1}
+      PROJECT_HUB_SKILLOPT_MAX_STEPS: ${PROJECT_HUB_SKILLOPT_MAX_STEPS:-1}
+      PROJECT_HUB_SKILLOPT_MAX_COMPLETION_TOKENS: ${PROJECT_HUB_SKILLOPT_MAX_COMPLETION_TOKENS:-650}
+      PROJECT_HUB_SKILLOPT_MAX_RUNS_PER_DAY: ${PROJECT_HUB_SKILLOPT_MAX_RUNS_PER_DAY:-1}
+      PROJECT_HUB_SKILLOPT_TIMEOUT_SECONDS: ${PROJECT_HUB_SKILLOPT_TIMEOUT_SECONDS:-600}
+      PROJECT_HUB_SKILLOPT_OPTIMIZER_MODEL: ${PROJECT_HUB_SKILLOPT_OPTIMIZER_MODEL:-qwen/qwen3.7-flash}
+      PROJECT_HUB_SKILLOPT_TARGET_MODEL: ${PROJECT_HUB_SKILLOPT_TARGET_MODEL:-qwen/qwen3.7-flash}
+      PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN: ${PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN:?Définir PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN dans .env}
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+      - ./profile-skills:/skill-catalog:ro
+    expose:
+      - "3014"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3014/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    networks:
+      - project_hub_internal
+
+  project-reference-miner:
+    build:
+      context: ./reference-miner
+    image: project-reference-miner:local
+    container_name: project-reference-miner
+    restart: unless-stopped
+    environment:
+      PORT: "3015"
+      PROJECT_HUB_WORKSPACE: /workspace
+      PROJECT_HUB_MEMORY_EXPORT_URL: http://project-shared-memory:3010/internal/reference-records
+      PROJECT_HUB_MEMORY_EXPORT_TOKEN: ${PROJECT_HUB_MEMORY_EXPORT_TOKEN:?Définir PROJECT_HUB_MEMORY_EXPORT_TOKEN dans .env}
+      # La découverte peut être autonome, mais tout candidat reste séparé des packs actifs.
+      PROJECT_HUB_REFERENCE_MINER_ENABLED: ${PROJECT_HUB_REFERENCE_MINER_ENABLED:-true}
+      PROJECT_HUB_REFERENCE_MINER_AUTONOMOUS_ENABLED: ${PROJECT_HUB_REFERENCE_MINER_AUTONOMOUS_ENABLED:-true}
+      PROJECT_HUB_REFERENCE_MINER_CYCLE_HOURS: ${PROJECT_HUB_REFERENCE_MINER_CYCLE_HOURS:-24}
+      PROJECT_HUB_REFERENCE_MINER_MAX_CANDIDATES: ${PROJECT_HUB_REFERENCE_MINER_MAX_CANDIDATES:-3}
+      PROJECT_HUB_REFERENCE_MINER_MAX_RUNS_PER_DAY: ${PROJECT_HUB_REFERENCE_MINER_MAX_RUNS_PER_DAY:-1}
+      PROJECT_HUB_AUTONOMOUS_PIPELINE_ENABLED: ${PROJECT_HUB_AUTONOMOUS_PIPELINE_ENABLED:-true}
+      PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN: ${PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN:?Définir PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN dans .env}
+      PROJECT_HUB_OPTIMIZER_AUTONOMOUS_URL: http://project-optimizer:3013/internal/autonomous-run
+      PROJECT_HUB_SKILLOPT_AUTONOMOUS_URL: http://project-skillopt:3014/internal/autonomous-run
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    depends_on:
+      project-shared-memory:
+        condition: service_healthy
+      project-optimizer:
+        condition: service_healthy
+      project-skillopt:
+        condition: service_healthy
+    expose:
+      - "3015"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3015/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - project_hub_internal
+
+  spacebot-project-hub:
+    image: spacebot-project-hub:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: spacebot-project-hub
+    restart: unless-stopped
+    environment:
+      SPACEBOT_DIR: /data
+      SPACEBOT_DEPLOYMENT: docker
+      SPACEBOT_CRON_TIMEZONE: America/Toronto
+      SPACEBOT_USER_TIMEZONE: America/Toronto
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
+      PROJECT_HUB_SKILL_INSTALL_REQUIRE_APPROVAL: "true"
+      PROJECT_HUB_SKILL_APPROVAL_DIR: /data/skill-install-authorizations
+      OPENCODE_DISABLE_AUTOUPDATE: "true"
+      OPENCODE_DISABLE_LSP_DOWNLOAD: "true"
+    ports:
+      # Interface Web locale. Garder ce bind en localhost sauf si un proxy authentifié est ajouté.
+      - "127.0.0.1:19898:19898"
+    volumes:
+      # Contient config.toml, l'espace partagé, les profils, les bases propres à Spacebot et les journaux.
+      - ./instance:/data
+    depends_on:
+      project-shared-memory:
+        condition: service_healthy
+      project-gis:
+        condition: service_healthy
+      project-document-studio:
+        condition: service_healthy
+      project-optimizer:
+        condition: service_healthy
+      project-skillopt:
+        condition: service_healthy
+      project-reference-miner:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:19898/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    networks:
+      - project_hub_internal
+      - project_hub_approval_internal
+
+  project-failure-remediator:
+    build:
+      context: ./failure-remediator
+    image: project-failure-remediator:local
+    container_name: project-failure-remediator
+    restart: unless-stopped
+    environment:
+      PORT: "3017"
+      PROJECT_HUB_WORKSPACE: /data/shared-workspace
+      PROJECT_HUB_SPACEBOT_API_URL: http://spacebot-project-hub:19898/api
+      PROJECT_HUB_FAILURE_REMEDIATOR_ENABLED: ${PROJECT_HUB_FAILURE_REMEDIATOR_ENABLED:-true}
+      PROJECT_HUB_FAILURE_REMEDIATOR_INTERVAL_SECONDS: ${PROJECT_HUB_FAILURE_REMEDIATOR_INTERVAL_SECONDS:-120}
+      PROJECT_HUB_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY: ${PROJECT_HUB_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY:-3}
+      PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN: ${PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN:?Définir PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN dans .env}
+    volumes:
+      - ./instance:/data:rw
+    depends_on:
+      spacebot-project-hub:
+        condition: service_healthy
+    expose:
+      - "3017"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3017/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - project_hub_approval_internal
+
+  project-approval-bridge:
+    build:
+      context: ./approval-bridge
+    image: project-approval-bridge:local
+    container_name: project-approval-bridge
+    restart: unless-stopped
+    environment:
+      PORT: "3016"
+      PROJECT_HUB_WORKSPACE: /data/shared-workspace
+      PROJECT_HUB_INSTANCE_ROOT: /data
+      PROJECT_HUB_SPACEBOT_API_URL: http://spacebot-project-hub:19898/api
+      PROJECT_HUB_APPROVAL_BRIDGE_ENABLED: ${PROJECT_HUB_APPROVAL_BRIDGE_ENABLED:-true}
+      PROJECT_HUB_APPROVAL_BRIDGE_INTERVAL_SECONDS: ${PROJECT_HUB_APPROVAL_BRIDGE_INTERVAL_SECONDS:-60}
+      PROJECT_HUB_APPROVAL_BRIDGE_TOKEN: ${PROJECT_HUB_APPROVAL_BRIDGE_TOKEN:?Définir PROJECT_HUB_APPROVAL_BRIDGE_TOKEN dans .env}
+    volumes:
+      - ./instance:/data:rw
+    depends_on:
+      spacebot-project-hub:
+        condition: service_healthy
+    expose:
+      - "3016"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3016/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - project_hub_approval_internal
+
+networks:
+  project_hub_internal:
+    driver: bridge
+  project_hub_approval_internal:
+    driver: bridge
+    internal: true
