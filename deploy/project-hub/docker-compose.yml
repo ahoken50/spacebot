@@ -227,6 +227,36 @@ services:
     networks:
       - project_hub_internal
 
+  project-municipal-watch:
+    build:
+      context: ./municipal-watch
+    image: project-municipal-watch:local
+    container_name: project-municipal-watch
+    restart: unless-stopped
+    environment:
+      PORT: "3018"
+      PROJECT_HUB_WORKSPACE: /workspace
+      PROJECT_HUB_MUNICIPAL_WATCH_ENABLED: ${PROJECT_HUB_MUNICIPAL_WATCH_ENABLED:-true}
+      PROJECT_HUB_MUNICIPAL_WATCH_INTERVAL_SECONDS: ${PROJECT_HUB_MUNICIPAL_WATCH_INTERVAL_SECONDS:-86400}
+      PROJECT_HUB_MUNICIPAL_WATCH_MAX_SOURCES: ${PROJECT_HUB_MUNICIPAL_WATCH_MAX_SOURCES:-12}
+      PROJECT_HUB_MUNICIPAL_WATCH_TOKEN: ${PROJECT_HUB_MUNICIPAL_WATCH_TOKEN:?Définir PROJECT_HUB_MUNICIPAL_WATCH_TOKEN dans .env}
+    volumes:
+      - ./instance/shared-workspace:/workspace:rw
+    expose:
+      - "3018"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3018/healthz').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - project_hub_internal
+
   spacebot-project-hub:
     image: spacebot-project-hub:local
     build:

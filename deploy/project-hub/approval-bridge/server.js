@@ -19,7 +19,7 @@ const ownerAgentId = 'project-coordination';
 const optimizationRoot = path.join(workspace, '00_systeme', 'optimisation');
 const bridgeRoot = path.join(optimizationRoot, 'approval-bridge');
 const promotionsRoot = path.join(bridgeRoot, 'promotions');
-const dspyTargets = new Set(['project-coordination', 'project-finance', 'project-planning', 'project-analysis', 'project-reporting', 'project-governance']);
+const dspyTargets = new Set(['project-coordination', 'project-finance', 'project-planning', 'project-analysis', 'project-reporting', 'project-governance', 'project-grants', 'project-regulatory']);
 const skillTargets = {
   'project-coordination': 'project-coordination',
   'project-finance-control': 'project-finance',
@@ -28,8 +28,11 @@ const skillTargets = {
   'project-reporting': 'project-reporting',
   'project-governance': 'project-governance',
   'project-document-studio': 'project-coordination',
+  'project-grants-funding': 'project-grants',
+  'project-regulatory-municipal': 'project-regulatory',
+  'project-municipal-writing': 'project-reporting',
 };
-const failureTargets = new Set(['project-coordination', 'project-finance', 'project-planning', 'project-analysis', 'project-reporting', 'project-governance']);
+const failureTargets = new Set(['project-coordination', 'project-finance', 'project-planning', 'project-analysis', 'project-reporting', 'project-governance', 'project-grants', 'project-regulatory']);
 const approvedOverlayRoot = path.join(instanceRoot, 'approved-skill-overlays');
 const skillInstallAuthorizationRoot = path.join(instanceRoot, 'skill-install-authorizations');
 
@@ -105,8 +108,17 @@ function summarizeCapabilitySkill(proposal) {
     `L’approbation autorise uniquement l’agent ciblé à utiliser install_skill dans son workspace; elle n’autorise ni MCP, ni dépendance système, ni secret, ni permission ou changement Docker.`,
   ].join(' ');
 }
+function summarizeMunicipalWatch(proposal) {
+  const source = proposal.source ?? {};
+  const change = proposal.change ?? {};
+  return [
+    `Changement détecté par la veille municipale : ${source.title ?? source.id ?? proposal.proposal_id}.`,
+    `Type : ${source.kind ?? 'non classé'}; détection : ${change.detected_at ?? 'n/d'}.`,
+    `La source doit être lue et son incidence qualifiée par une personne responsable; aucune conclusion juridique, admissibilité de subvention, application ou transmission n’est automatique.`,
+  ].join(' ');
+}
 function proposalRequiresReview(proposal) {
-  return proposal?.proposal_id && !['approved_promoted', 'approved_for_agent_install', 'rejected_by_user', 'installed_after_approval'].includes(proposal.status);
+  return proposal?.proposal_id && !['approved_promoted', 'approved_reviewed', 'approved_for_agent_install', 'rejected_by_user', 'installed_after_approval'].includes(proposal.status);
 }
 function taskDescription(kind, proposal, proposalPath, proposalDir) {
   const summary = kind === 'dspy'
@@ -115,10 +127,14 @@ function taskDescription(kind, proposal, proposalPath, proposalDir) {
       ? summarizeSkillOpt(proposal)
       : kind === 'failure_remediation'
         ? summarizeFailureRemediation(proposal)
-        : summarizeCapabilitySkill(proposal);
+        : kind === 'municipal_watch'
+          ? summarizeMunicipalWatch(proposal)
+          : summarizeCapabilitySkill(proposal);
   const decisionText = kind === 'capability_skill_acquisition'
     ? '**Approuver** autorise uniquement l’agent ciblé à installer cette compétence avec l’outil natif `install_skill` dans son workspace, après une dernière vérification. Le pont n’installe aucun code et ne change aucune capacité système. **Dismiss/Rejeter** replace la tâche dans le backlog et conserve les artefacts sans installation.'
-    : '**Approuver** dans l’interface applique uniquement cette candidate contrôlée et consigne un audit local. **Dismiss/Rejeter** replace la tâche dans le backlog et conserve les artefacts sans les appliquer.';
+    : kind === 'municipal_watch'
+      ? '**Approuver** consigne que cette fiche de veille a été examinée dans l’interface; il ne modifie aucun règlement, politique, projet, permis, subvention ou communication. **Dismiss/Rejeter** classe la fiche comme non retenue et conserve les artefacts.'
+      : '**Approuver** dans l’interface applique uniquement cette candidate contrôlée et consigne un audit local. **Dismiss/Rejeter** replace la tâche dans le backlog et conserve les artefacts sans les appliquer.';
   return [
     '## Approbation finale requise',
     '',
@@ -137,6 +153,7 @@ async function discoverProposals() {
   const skilloptDirectory = path.join(optimizationRoot, 'skillopt', 'propositions');
   const failureDirectory = path.join(optimizationRoot, 'failure-remediator', 'proposals');
   const capabilityDirectory = path.join(workspace, '00_systeme', 'propositions_capacites');
+  const municipalWatchDirectory = path.join(workspace, '00_systeme', 'veille-municipale', 'proposals');
   const proposals = [];
   for (const filename of await fs.readdir(dspyDirectory).catch(() => [])) {
     if (!filename.endsWith('.json')) continue;
@@ -170,12 +187,20 @@ async function discoverProposals() {
       proposals.push({ kind: 'capability_skill_acquisition', proposalPath, proposalDir: capabilityDirectory, proposal });
     }
   }
+  for (const directory of await fs.readdir(municipalWatchDirectory).catch(() => [])) {
+    const proposalDir = path.join(municipalWatchDirectory, directory);
+    const proposalPath = path.join(proposalDir, 'proposal.json');
+    const proposal = await readJson(proposalPath);
+    if (proposal?.kind === 'municipal_watch' && proposalRequiresReview(proposal)) {
+      proposals.push({ kind: 'municipal_watch', proposalPath, proposalDir, proposal });
+    }
+  }
   return proposals.sort((left, right) => String(left.proposal.created_at).localeCompare(String(right.proposal.created_at)));
 }
 
 async function createApprovalTask(record) {
   const { kind, proposal, proposalPath, proposalDir } = record;
-  const label = kind === 'dspy' ? 'DSPy' : kind === 'skillopt' ? 'SkillOpt' : kind === 'failure_remediation' ? 'Leçon après échec' : 'Compétence externe';
+  const label = kind === 'dspy' ? 'DSPy' : kind === 'skillopt' ? 'SkillOpt' : kind === 'failure_remediation' ? 'Leçon après échec' : kind === 'municipal_watch' ? 'Veille municipale' : 'Compétence externe';
   const title = `${label} — approbation finale : ${proposal.proposal_id}`;
   const metadata = {
     project_hub_approval: {
@@ -375,7 +400,24 @@ async function finishTask(task, summary) {
   }
 }
 
+async function markMunicipalWatchReviewed(record, task) {
+  record.proposal.status = 'approved_reviewed';
+  record.proposal.promotion = 'review_recorded_no_automatic_action';
+  record.proposal.approval_bridge = {
+    ...(record.proposal.approval_bridge ?? {}), task_number: task.task_number,
+    approved_by: task.approved_by ?? 'human', approved_at: task.approved_at ?? nowIso(), reviewed_at: nowIso(),
+  };
+  await writeJson(record.proposalPath, record.proposal);
+  await writePromotionAudit(record.proposal.proposal_id, {
+    proposal_id: record.proposal.proposal_id, kind: record.kind, task_number: task.task_number,
+    approved_by: task.approved_by ?? 'human', reviewed_at: nowIso(), promotion: 'review_recorded_no_automatic_action',
+  });
+  await finishTask(task, `Fiche de veille ${record.proposal.proposal_id} examinée; aucune action automatique appliquée.`);
+  return { review: 'recorded_no_automatic_action', source: record.proposal.source?.url ?? null };
+}
+
 async function applyApprovedProposal(record, task) {
+  if (record.kind === 'municipal_watch') return markMunicipalWatchReviewed(record, task);
   if (record.kind === 'capability_skill_acquisition') {
     const result = await authorizeCapabilitySkill(record, task);
     await finishTask(task, `Compétence ${result.skill_source} autorisée pour installation contrôlée par ${result.target_agent_id}.`);

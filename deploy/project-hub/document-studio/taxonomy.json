@@ -63,7 +63,11 @@
         "06_rapports_et_syntheses/01_notes",
         "06_rapports_et_syntheses/02_rapports_intermediaires",
         "06_rapports_et_syntheses/03_rapport_final",
-        "06_rapports_et_syntheses/04_annexes_preuves"
+        "06_rapports_et_syntheses/04_annexes_preuves",
+        "06_rapports_et_syntheses/05_subventions",
+        "06_rapports_et_syntheses/06_reglementation",
+        "06_rapports_et_syntheses/07_politiques",
+        "06_rapports_et_syntheses/08_communications"
       ]
     },
     "deliverable": {

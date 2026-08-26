@@ -15,7 +15,7 @@ root_dockerfile = (ROOT / '..' / '..' / 'Dockerfile').resolve().read_text(encodi
 agents = config['agents']
 agent_ids = {agent['id'] for agent in agents}
 human_ids = {human['id'] for human in config['humans']}
-assert len(agents) == 6, 'Six profils Project Hub sont requis.'
+assert len(agents) == 8, 'Huit profils municipaux Project Hub sont requis.'
 assert len(agent_ids) == len(agents), 'Les IDs des agents doivent être uniques.'
 assert sum(bool(agent.get('default')) for agent in agents) == 1, 'Un seul agent par défaut est requis.'
 assert all(re.fullmatch(r'[a-z0-9_-]+', agent_id) for agent_id in agent_ids), 'ID agent invalide.'
@@ -66,13 +66,15 @@ expected_agent_mcp = {
     'project-analysis': {'project_gis_local', 'project_document_studio'},
     'project-reporting': {'project_document_studio'},
     'project-governance': {'project_document_studio'},
+    'project-grants': {'project_document_studio'},
+    'project-regulatory': {'project_document_studio'},
 }
 for agent in agents:
     tool_names = {entry['name'] for entry in agent.get('mcp', [])}
     assert tool_names == expected_agent_mcp[agent['id']], f'MCP ciblés incorrects pour {agent["id"]}: {tool_names}'
-coordination = next(agent for agent in agents if agent['id'] == 'project-coordination')
-assert coordination['browser']['enabled'] is True
-for service in ('project-memory-db:', 'project-shared-memory:', 'project-gis:', 'project-document-studio:', 'project-optimizer:', 'project-skillopt:', 'project-reference-miner:', 'spacebot-project-hub:', 'project-failure-remediator:', 'project-approval-bridge:'):
+for browser_agent in ('project-coordination', 'project-grants', 'project-regulatory'):
+    assert next(agent for agent in agents if agent['id'] == browser_agent)['browser']['enabled'] is True, f'Navigation contrôlée requise pour {browser_agent}.'
+for service in ('project-memory-db:', 'project-shared-memory:', 'project-gis:', 'project-document-studio:', 'project-optimizer:', 'project-skillopt:', 'project-reference-miner:', 'project-municipal-watch:', 'spacebot-project-hub:', 'project-failure-remediator:', 'project-approval-bridge:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'PROJECT_HUB_OPTIMIZER_ENABLED: ${PROJECT_HUB_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
 optimizer_server = (ROOT / 'optimizer' / 'server.js').read_text(encoding='utf-8')
@@ -88,6 +90,15 @@ assert 'PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN: ${PROJECT_HUB_AUTONOMOUS_PIPELINE
 assert 'PROJECT_HUB_APPROVAL_BRIDGE_TOKEN: ${PROJECT_HUB_APPROVAL_BRIDGE_TOKEN:?Définir PROJECT_HUB_APPROVAL_BRIDGE_TOKEN dans .env}' in compose, 'Le pont d’approbation doit exiger un jeton local.'
 assert 'PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN: ${PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN:?Définir PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN dans .env}' in compose, 'Le diagnostiqueur d’échec doit exiger un jeton local.'
 assert 'PROJECT_HUB_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY: ${PROJECT_HUB_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY:-3}' in compose, 'La boucle d’échec doit imposer un plafond journalier.'
+assert 'PROJECT_HUB_MUNICIPAL_WATCH_TOKEN: ${PROJECT_HUB_MUNICIPAL_WATCH_TOKEN:?Définir PROJECT_HUB_MUNICIPAL_WATCH_TOKEN dans .env}' in compose, 'La veille municipale doit exiger un jeton interne.'
+assert 'PROJECT_HUB_MUNICIPAL_WATCH_INTERVAL_SECONDS: ${PROJECT_HUB_MUNICIPAL_WATCH_INTERVAL_SECONDS:-86400}' in compose, 'La veille municipale doit être configurée pour un cycle quotidien.'
+municipal_watch = (ROOT / 'municipal-watch' / 'server.js').read_text(encoding='utf-8')
+municipal_policy = json.loads((ROOT / 'municipal-watch' / 'fixtures' / 'municipal_watch_policy.template.json').read_text(encoding='utf-8'))
+assert 'requireApprovedPolicy' in municipal_watch and 'waiting_for_approved_policy' in municipal_watch, 'La veille doit attendre une politique locale explicitement approuvée.'
+assert "kind: 'municipal_watch'" in municipal_watch and 'proposalStillPending' in municipal_watch, 'La veille doit dédupliquer les fiches et les soumettre à examen.'
+assert 'legal_conclusions !== false' in municipal_watch and 'grant_submission !== false' in municipal_watch, 'La veille doit interdire les conclusions juridiques et soumissions automatiques.'
+assert municipal_policy['allow_municipal_watch'] is False and municipal_policy['auto_apply'] is False and municipal_policy['auto_send'] is False, 'Le gabarit de veille doit rester inactif et sans action automatique.'
+assert municipal_policy['legal_conclusions'] is False and municipal_policy['grant_submission'] is False, 'Le gabarit de veille doit interdire avis juridique et soumission de subvention.'
 assert 'env_file:' not in compose, 'Les services Project Hub doivent recevoir seulement les secrets explicitement requis.'
 assert 'PROJECT_HUB_SKILL_INSTALL_REQUIRE_APPROVAL: "true"' in compose, 'L’installation externe de compétences doit exiger une autorisation Project Hub.'
 assert 'PROJECT_HUB_SKILL_APPROVAL_DIR: /data/skill-install-authorizations' in compose, 'Le verrou d’installation doit lire les autorisations persistantes hors du workspace agent.'
@@ -118,6 +129,7 @@ for dockerfile in (
     ROOT / 'reference-miner' / 'Dockerfile',
     ROOT / 'approval-bridge' / 'Dockerfile',
     ROOT / 'failure-remediator' / 'Dockerfile',
+    ROOT / 'municipal-watch' / 'Dockerfile',
 ):
     dockerfile_text = dockerfile.read_text(encoding='utf-8')
     assert 'frozen-lockfile=false' not in dockerfile_text, f'Argument Bun invalide dans {dockerfile}.'
@@ -136,12 +148,15 @@ assert "approved-skill-overlays" in approval_bridge and "persistAndInstallSkill"
 assert "capability_skill_acquisition" in approval_bridge and "authorizeCapabilitySkill" in approval_bridge, 'Le pont doit soumettre les compétences externes à l’approbation UI.'
 assert "skill-install-authorizations" in approval_bridge and "capability_skill_install_authorization" in approval_bridge, 'Le pont doit déposer une autorisation réservée hors du workspace agent.'
 assert "approved_for_agent_install" in approval_bridge and "workspace_skill_only" in approval_bridge, 'Une compétence externe approuvée doit rester limitée au workspace.'
+assert "municipal_watch" in approval_bridge and "markMunicipalWatchReviewed" in approval_bridge, 'La veille municipale doit passer par l’approbation UI.'
+assert "review_recorded_no_automatic_action" in approval_bridge, 'Une fiche de veille approuvée ne doit déclencher aucune action automatique.'
 failure_remediator = (ROOT / 'failure-remediator' / 'server.js').read_text(encoding='utf-8')
 assert "'/tasks?limit=500'" in failure_remediator and '/tasks/${taskNumber}/attempts' in failure_remediator, 'La boucle doit lire les tâches et leurs tentatives Spacebot.'
 assert "missing_or_unavailable_mcp" in failure_remediator and "missing_tool" in failure_remediator and "prompt_or_context_unclear" in failure_remediator, 'Les catégories de diagnostic requises sont absentes.'
 assert "repeat_suppressed" in failure_remediator and "maxProposalsPerDay" in failure_remediator, 'La boucle doit supprimer les répétitions et appliquer un plafond.'
 assert "[courriel retiré]" in failure_remediator and "[secret retiré]" in failure_remediator, 'Les résumés d’échec doivent être dépersonnalisés.'
 assert "auto_promote: false" in failure_remediator and "mcp_change: false" in failure_remediator, 'Une leçon ne doit jamais modifier automatiquement une capacité.'
+assert "project-grants" in failure_remediator and "project-regulatory" in failure_remediator, 'Les profils municipaux spécialisés doivent être couverts par la remédiation.'
 capability_skill = (ROOT / 'skills' / 'project-capability-discovery' / 'SKILL.md').read_text(encoding='utf-8')
 capability_template = ROOT / 'skills' / 'project-capability-discovery' / 'templates' / 'capability_skill_acquisition.template.json'
 assert capability_template.is_file(), 'Le gabarit de demande de compétence externe est requis.'
@@ -153,10 +168,12 @@ python_scaffold = ROOT / 'profile-skills' / 'project-python-workbench' / 'script
 assert python_skill.is_file() and python_scaffold.is_file(), 'La compétence Python et son générateur sont requis.'
 assert 'python3 -m py_compile' in python_skill.read_text(encoding='utf-8'), 'La compétence Python doit exiger une compilation de contrôle.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
-assert bootstrap.count('project-python-workbench') == 6, 'La compétence Python doit être préchargée pour les six profils.'
+assert bootstrap.count('project-python-workbench') == 8, 'La compétence Python doit être préchargée pour les huit profils municipaux.'
 assert 'workspace/skills' in bootstrap and 'approved-skill-overlays' in bootstrap, 'Les compétences de profil et recouvrements approuvés doivent être préparés dans les workspaces privés.'
 assert 'skill-install-authorizations' in bootstrap, 'Le bootstrap doit préparer la zone réservée aux autorisations de compétences.'
 assert '00_systeme/scripts' in bootstrap, 'Le répertoire de scripts Project Hub doit être initialisé.'
+assert '00_systeme/veille-municipale/proposals' in bootstrap and 'municipal_watch_policy.template.json' in bootstrap, 'Le bootstrap doit préparer la veille municipale et sa politique.'
+assert bootstrap.count('project-municipal-writing') == 4, 'La compétence de rédaction municipale doit être préchargée aux profils pertinents.'
 optimizer_dockerfile = (ROOT / 'optimizer' / 'Dockerfile').read_text(encoding='utf-8')
 assert 'FROM oven/bun:1.3.4-alpine' in optimizer_dockerfile, 'L’image DSPy doit être alignée sur Bun 1.3.4.'
 
@@ -190,10 +207,16 @@ for required in [
     ROOT / 'approval-bridge' / 'server.js',
     ROOT / 'approval-bridge' / 'test_failure_remediation.mjs',
     ROOT / 'approval-bridge' / 'test_capability_skill_acquisition.mjs',
+    ROOT / 'approval-bridge' / 'test_municipal_watch_review.mjs',
     ROOT / 'failure-remediator' / 'Dockerfile',
     ROOT / 'failure-remediator' / 'package.json',
     ROOT / 'failure-remediator' / 'server.js',
     ROOT / 'failure-remediator' / 'test_integration.mjs',
+    ROOT / 'municipal-watch' / 'Dockerfile',
+    ROOT / 'municipal-watch' / 'package.json',
+    ROOT / 'municipal-watch' / 'server.js',
+    ROOT / 'municipal-watch' / 'test_integration.mjs',
+    ROOT / 'municipal-watch' / 'fixtures' / 'municipal_watch_policy.template.json',
     ROOT / 'skills' / 'project-foundation' / 'SKILL.md',
     ROOT / 'skills' / 'project-capability-discovery' / 'SKILL.md',
     ROOT / 'skills' / 'project-capability-discovery' / 'templates' / 'capability_skill_acquisition.template.json',
@@ -210,8 +233,14 @@ for required in [
     ROOT / 'profile-skills' / 'project-failure-learning' / 'SKILL.md',
     ROOT / 'profile-skills' / 'project-python-workbench' / 'SKILL.md',
     ROOT / 'profile-skills' / 'project-python-workbench' / 'scripts' / 'scaffold_project_python_script.py',
+    ROOT / 'profile-skills' / 'project-grants-funding' / 'SKILL.md',
+    ROOT / 'profile-skills' / 'project-regulatory-municipal' / 'SKILL.md',
+    ROOT / 'profile-skills' / 'project-municipal-writing' / 'SKILL.md',
+    ROOT / 'profile-skills' / 'project-municipal-writing' / 'templates' / 'note_service_fiche_decisionnelle.md',
+    ROOT / 'profile-skills' / 'project-municipal-writing' / 'templates' / 'reunion_proces_verbal.md',
+    ROOT / 'profile-skills' / 'project-municipal-writing' / 'templates' / 'politique_environnementale.md',
 ]:
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique Project Hub : OK')
-print('Agents: 6 | Workspaces privés + données partagées sandboxées | Secrets par moindre privilège | MCP ciblés | OpenCode/Python: activés | Routage: OpenRouter sans Claude | Autonomie: apprentissage et acquisition de compétences jusqu’à approbation UI | Taxonomie: 8 catégories génériques | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')
+print('Agents: 8 | Workspaces privés + données partagées sandboxées | Veille municipale quotidienne sourcée | Subventions, réglementation, réunions et rédaction en brouillon | Secrets par moindre privilège | MCP ciblés | OpenCode/Python: activés | Routage: OpenRouter sans Claude | Autonomie: apprentissage et acquisition de compétences jusqu’à approbation UI | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')

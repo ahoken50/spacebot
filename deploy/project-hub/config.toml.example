@@ -107,14 +107,14 @@ url = "http://project-shared-memory:3010/mcp"
 
 [[humans]]
 id = "project-sponsor"
-display_name = "Responsable du projet"
-role = "Autorité d’approbation des orientations, engagements, livrables officiels et changements durables."
-bio = "Approuve les décisions sensibles, les livrables externes, les changements de budget, d’échéancier et de capacité."
+display_name = "Responsable municipal désigné"
+role = "Autorité d’approbation des orientations, engagements, livrables officiels, communications externes et changements durables."
+bio = "Valide les décisions sensibles, les livrables externes, les changements de budget, d’échéancier, de capacité et toute diffusion officielle."
 
 [[agents]]
 id = "project-coordination"
-display_name = "Coordonnateur de projet"
-role = "Point d’entrée Web, qualification, planification, délégation, consolidation et demande d’approbation."
+display_name = "Coordonnateur municipal de projets"
+role = "Point d’entrée Web du coordonnateur en environnement : qualification, planification, délégation, consolidation et demande d’approbation pour tout projet municipal."
 default = true
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
@@ -229,6 +229,50 @@ name = "project_document_studio"
 transport = "http"
 url = "http://project-document-studio:3012/mcp"
 
+[[agents]]
+id = "project-grants"
+display_name = "Analyste des subventions et partenariats"
+role = "Veille des appels de financement, fiches d’admissibilité à confirmer, calendrier de dépôt et préparation contrôlée des dossiers municipaux."
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
+
+[agents.browser]
+enabled = true
+headless = true
+evaluate_enabled = false
+persist_session = false
+close_policy = "close_tabs"
+
+[[agents.mcp]]
+name = "project_document_studio"
+transport = "http"
+url = "http://project-document-studio:3012/mcp"
+
+[[agents]]
+id = "project-regulatory"
+display_name = "Analyste de veille réglementaire municipale"
+role = "Veille des sources officielles, matrice d’incidences, brouillons de règlements et politiques environnementales, avec revue humaine obligatoire des conclusions."
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
+
+[agents.browser]
+enabled = true
+headless = true
+evaluate_enabled = false
+persist_session = false
+close_policy = "close_tabs"
+
+[[agents.mcp]]
+name = "project_document_studio"
+transport = "http"
+url = "http://project-document-studio:3012/mcp"
+
 [[links]]
 from = "project-sponsor"
 to = "project-coordination"
@@ -266,6 +310,18 @@ direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
+from = "project-coordination"
+to = "project-grants"
+direction = "two_way"
+kind = "hierarchical"
+
+[[links]]
+from = "project-coordination"
+to = "project-regulatory"
+direction = "two_way"
+kind = "hierarchical"
+
+[[links]]
 from = "project-finance"
 to = "project-reporting"
 direction = "two_way"
@@ -283,7 +339,31 @@ to = "project-governance"
 direction = "two_way"
 kind = "peer"
 
+[[links]]
+from = "project-grants"
+to = "project-finance"
+direction = "two_way"
+kind = "peer"
+
+[[links]]
+from = "project-grants"
+to = "project-reporting"
+direction = "two_way"
+kind = "peer"
+
+[[links]]
+from = "project-regulatory"
+to = "project-analysis"
+direction = "two_way"
+kind = "peer"
+
+[[links]]
+from = "project-regulatory"
+to = "project-governance"
+direction = "two_way"
+kind = "peer"
+
 [[groups]]
 name = "Pilotage de projets"
-agent_ids = ["project-coordination", "project-finance", "project-planning", "project-analysis", "project-reporting", "project-governance"]
+agent_ids = ["project-coordination", "project-finance", "project-planning", "project-analysis", "project-reporting", "project-governance", "project-grants", "project-regulatory"]
 color = "#0F766E"

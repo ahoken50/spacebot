@@ -23,6 +23,8 @@ mkdir -p \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/approval-bridge/promotions" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/failure-remediator/proposals" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/failure-remediator/audits" \
+  "${SHARED_WORKSPACE}/00_systeme/veille-municipale/proposals" \
+  "${SHARED_WORKSPACE}/00_systeme/veille-municipale/snapshots" \
   "${SHARED_WORKSPACE}/01_sources/00_inbox" \
   "${SHARED_WORKSPACE}/01_sources/01_cadre_reference" \
   "${SHARED_WORKSPACE}/01_sources/02_donnees_et_resultats" \
@@ -51,6 +53,10 @@ mkdir -p \
   "${SHARED_WORKSPACE}/06_rapports_et_syntheses/02_rapports_intermediaires" \
   "${SHARED_WORKSPACE}/06_rapports_et_syntheses/03_rapport_final" \
   "${SHARED_WORKSPACE}/06_rapports_et_syntheses/04_annexes_preuves" \
+  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/05_subventions" \
+  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/06_reglementation" \
+  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/07_politiques" \
+  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/08_communications" \
   "${SHARED_WORKSPACE}/07_livrables/00_reference" \
   "${SHARED_WORKSPACE}/07_livrables/01_brouillons" \
   "${SHARED_WORKSPACE}/07_livrables/02_revue_qualite" \
@@ -70,6 +76,7 @@ cp --update=none "${ROOT_DIR}/document-studio/taxonomy.json" "${SHARED_WORKSPACE
 cp --update=none "${ROOT_DIR}/optimizer/fixtures/reference_cases.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/reference_cases.template.json"
 cp --update=none "${ROOT_DIR}/skillopt/fixtures/skillopt_reference_pack.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/skillopt_reference_pack.template.json"
 cp --update=none "${ROOT_DIR}/reference-miner/fixtures/reference_mining_policy.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/reference-miner/reference_mining_policy.template.json"
+cp --update=none "${ROOT_DIR}/municipal-watch/fixtures/municipal_watch_policy.template.json" "${SHARED_WORKSPACE}/00_systeme/veille-municipale/municipal_watch_policy.template.json"
 
 write_profile() {
   local agent_id="$1"
@@ -131,14 +138,14 @@ write_profile \
   "Coordonnateur de projet" \
   "Qualifier les demandes, créer le plan de travail, déléguer aux profils appropriés, consolider les résultats et demander les approbations requises." \
   "Rester orienté vers un résultat fini, vérifiable et utile. Préserver la traçabilité des arbitrages, la proportionnalité des efforts et les limites d’autonomie." \
-  "project-coordination project-finance-control project-planning-governance project-analysis project-reporting project-document-studio project-supervised-optimization project-skillopt-learning project-reference-case-mining project-failure-learning project-python-workbench"
+  "project-coordination project-finance-control project-planning-governance project-analysis project-reporting project-document-studio project-supervised-optimization project-skillopt-learning project-reference-case-mining project-failure-learning project-python-workbench project-grants-funding project-regulatory-municipal project-municipal-writing"
 
 write_profile \
   "project-finance" \
   "Analyste financier et administratif" \
   "Assurer le suivi du budget, des dépenses, contrats, appels d’offres, sources de financement, admissibilité et écarts. Préparer les rapprochements et alertes." \
   "Privilégier les montants sourcés, les pièces de preuve et la distinction entre prévision, engagement, dépense et paiement." \
-  "project-finance-control project-reporting project-document-studio project-failure-learning project-python-workbench"
+  "project-finance-control project-reporting project-document-studio project-failure-learning project-python-workbench project-grants-funding"
 
 write_profile \
   "project-planning" \
@@ -159,14 +166,28 @@ write_profile \
   "Rédacteur et analyste de livrables" \
   "Préparer rapports, notes décisionnelles, synthèses de recherche, annexes et contrôles de qualité rédactionnelle." \
   "Rédiger de façon claire, administrative et fondée sur les preuves. Tenir une liste des sources et données manquantes." \
-  "project-reporting project-document-studio project-finance-control project-analysis project-failure-learning project-python-workbench"
+  "project-reporting project-document-studio project-finance-control project-analysis project-failure-learning project-python-workbench project-regulatory-municipal project-municipal-writing"
 
 write_profile \
   "project-governance" \
   "Secrétaire et analyste de gouvernance" \
   "Organiser les comités, préparer convocations et ordres du jour, rédiger les procès-verbaux, suivre les décisions, responsables, échéances, risques et relances." \
   "Faire ressortir ce qui est décidé, à faire, en attente ou à escalader. Un procès-verbal reste un brouillon jusqu’à validation explicite." \
-  "project-governance project-planning-governance project-document-studio project-failure-learning project-python-workbench"
+  "project-governance project-planning-governance project-document-studio project-failure-learning project-python-workbench project-regulatory-municipal project-municipal-writing"
+
+write_profile \
+  "project-grants" \
+  "Analyste des subventions et partenariats" \
+  "Rechercher les programmes, comparer les exigences publiées, préparer des fiches de décision et un calendrier de préparation, puis orienter les dossiers retenus vers les profils financiers, techniques et rédactionnels." \
+  "Ne jamais confirmer l’admissibilité, créer un compte, déposer une demande, accepter une condition ou transmettre un dossier. Associer chaque information à sa source institutionnelle et sa date." \
+  "project-grants-funding project-finance-control project-reporting project-document-studio project-failure-learning project-python-workbench"
+
+write_profile \
+  "project-regulatory" \
+  "Analyste de veille réglementaire municipale" \
+  "Suivre les sources approuvées, préparer les matrices d’incidences, contribuer aux brouillons de règlements et politiques environnementales, et organiser les validations du greffe, des affaires juridiques, de la direction et des services concernés." \
+  "Ne pas rendre d’avis juridique, certifier une conformité, publier, déposer, signer, affirmer l’entrée en vigueur d’un texte ou remplacer une validation humaine compétente." \
+  "project-regulatory-municipal project-municipal-writing project-governance project-reporting project-analysis project-document-studio project-failure-learning project-python-workbench"
 
 cat > "${SHARED_WORKSPACE}/README.md" <<'EOF'
 # Espace documentaire commun — Project Hub
@@ -174,6 +195,10 @@ cat > "${SHARED_WORKSPACE}/README.md" <<'EOF'
 La structure numérotée est la référence de classement. Déposer d’abord les nouvelles pièces dans `01_sources/00_inbox/`, puis utiliser la taxonomie `00_systeme/taxonomie_documentaire.json` et l’outil `classify_workspace_document` pour les déplacer vers un dossier autorisé. Les versions de travail, révisions, documents approuvés et documents transmis vont respectivement dans `07_livrables/01_brouillons/`, `07_livrables/02_revue_qualite/`, `07_livrables/03_approuves/` et `07_livrables/04_transmis/`.
 
 Ne jamais placer de clés API, mots de passe ou documents non autorisés dans cet espace. Enregistrer les références avec leur nom de fichier, date, section ou onglet source, chemin classé et statut de validation.
+
+La veille municipale conserve sa politique, ses références, extraits et fiches d’examen sous `00_systeme/veille-municipale/`. Elle reste inactive tant que `municipal_watch_policy.approved.json` n’autorise pas explicitement les sources. Une fiche détectée ne constitue pas une conclusion juridique, une admissibilité de subvention, un règlement, une politique ou une communication approuvée.
+
+Les fiches de subventions, matrices réglementaires, brouillons de politiques et communications se classent sous `06_rapports_et_syntheses/05_subventions/` à `08_communications/`. Les notes de réunion et procès-verbaux restent des brouillons jusqu’à leur validation par l’instance compétente.
 
 Le mineur de références ne lit que les enregistrements partagés `approved`, `completed=true` et `learning_eligible=true`. La remédiation lit seulement les résumés de tentatives durables; elle dépersonnalise, déduplique et crée une leçon candidate bloquée jusqu’à **Approve**. Les compétences approuvées sont conservées sous `instance/approved-skill-overlays/`; les autorisations de téléchargement externes sont hors des workspaces agents, sous `instance/skill-install-authorizations/`.
 EOF

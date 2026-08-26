@@ -14,7 +14,7 @@ const intervalSeconds = Math.max(30, Number.parseInt(process.env.PROJECT_HUB_FAI
 const maxProposalsPerDay = Math.max(1, Number.parseInt(process.env.PROJECT_HUB_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY ?? '3', 10) || 3);
 const serviceToken = process.env.PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN ?? '';
 const ownerAgentId = 'project-coordination';
-const allowedAgents = new Set(['project-coordination', 'project-finance', 'project-planning', 'project-analysis', 'project-reporting', 'project-governance']);
+const allowedAgents = new Set(['project-coordination', 'project-finance', 'project-planning', 'project-analysis', 'project-reporting', 'project-governance', 'project-grants', 'project-regulatory']);
 const actionableOutcomes = new Set(['failed', 'blocked', 'timed_out']);
 
 const remediationRoot = path.join(workspace, '00_systeme', 'optimisation', 'failure-remediator');
