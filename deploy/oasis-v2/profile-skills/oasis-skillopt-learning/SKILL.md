@@ -11,7 +11,7 @@ Utiliser **DSPy** pour améliorer une instruction ou un comportement court sur d
 
 ## Préparer un pack utilisable
 
-1. Consulter `skillopt_status`, puis `skillopt_validate_reference_pack`.
+1. Consulter `oasis_skillopt_skillopt_status`, puis `oasis_skillopt_skillopt_validate_reference_pack`.
 2. Utiliser seulement `00_systeme/optimisation/skillopt/skillopt_reference_pack.approved.json` lorsque son statut est `approved`, son attribut `redacted` vaut `true` et son scope est `skill_text_only`.
 3. Maintenir des identifiants distincts dans `training_cases`, `validation_cases` et `holdout_cases`. Réserver la partition holdout au contrôle final.
 4. Inclure des critères objectifs : termes requis ou interdits, références de source, longueur maximale, structure attendue ou résultat d’un outil local. Ne pas utiliser une impression générale comme unique métrique.

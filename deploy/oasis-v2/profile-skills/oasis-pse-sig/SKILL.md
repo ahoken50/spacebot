@@ -15,10 +15,10 @@ Les valeurs initiales documentées sont **1,41 ha** d’infrastructures vertes p
 
 ## Calculer les superficies du KML
 
-1. Déposer le KML dans `sources/` puis utiliser `inspect_kml` pour dresser l’inventaire local des objets, noms, surfaces brutes et erreurs de lecture.
-2. Utiliser `export_kml_geojson` pour produire une copie GeoJSON de travail dans `livrables/sig/`; le KML et le GeoJSON restent sur la machine locale.
+1. Déposer le KML dans `01_sources/05_sig_et_donnees/` puis utiliser `oasis_gis_local_inspect_kml` pour dresser l’inventaire local des objets, noms, surfaces brutes et erreurs de lecture.
+2. Utiliser `oasis_gis_local_export_kml_geojson` pour produire une copie GeoJSON de travail dans `04_pse_sig/02_kml_geojson/`; le KML et le GeoJSON restent sur la machine locale.
 3. Créer ou importer les emprises polygonales nommées `P1`, `P2` et `P3` dans un GeoJSON. Le KML brut ne suffit pas pour attribuer tous les objets techniques aux trois projets.
-4. Utiliser `project_surface_analysis` avec les emprises validées; il calcule les intersections géodésiques et produit un GeoJSON de contrôle.
+4. Utiliser `oasis_gis_local_project_surface_analysis` avec les emprises validées; il calcule les intersections géodésiques et produit un GeoJSON de contrôle.
 5. Dans un SIG municipal, classer les objets par type, dissoudre les surfaces d’un même type et éliminer les doublons ou chevauchements avant d’établir une valeur finale.
 6. Documenter les règles de classification, les formules, les captures et une contre-vérification. Inscrire le résultat dans `Calculs_SIG_PSE_OASIS_V2.xlsx` et dans la mémoire partagée avec son statut de validation.
 

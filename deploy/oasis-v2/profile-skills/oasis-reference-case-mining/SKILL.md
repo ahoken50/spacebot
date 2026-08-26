@@ -11,9 +11,9 @@ Créer des **candidats** de cas de référence réutilisables à partir d’enre
 
 ## Procédure
 
-1. Consulter `reference_miner_status`, puis valider la politique avec `reference_miner_validate_policy`.
+1. Consulter `oasis_reference_miner_reference_miner_status`, puis valider la politique avec `oasis_reference_miner_reference_miner_validate_policy`.
 2. Vérifier que la politique est approuvée, exige la dépersonnalisation et limite les types d’enregistrements.
-3. Lancer `reference_miner_discover_candidates` pour un essai. Après vérification, activer `autonomous_mining=true` et `autonomous_pipeline=true` dans la politique afin que `reference_miner_autonomous_cycle` applique le plafond périodique autorisé.
+3. Lancer `oasis_reference_miner_reference_miner_discover_candidates` pour un essai. Après vérification, activer `autonomous_mining=true` et `autonomous_pipeline=true` dans la politique afin que `oasis_reference_miner_reference_miner_autonomous_cycle` applique le plafond périodique autorisé.
 4. Le pipeline produit `dspy_candidates.json`, `skillopt_candidates.json` et des packs temporaires `system_validated` dans `00_systeme/optimisation/reference-miner/autonomous-packs/`.
 5. Il déclenche ensuite les évaluations DSPy et SkillOpt sur ces packs temporaires, en respectant leurs quotas existants et en enregistrant une proposition `pending_approval`.
 6. Le pont d’approbation crée automatiquement une tâche `pending_approval` dans l’interface Spacebot avec le chemin de la proposition, les scores et les références. Examiner le diff et les preuves avec le coordonnateur, puis utiliser **Approve** dans le tableau de tâches pour appliquer la candidate, ou **Dismiss** pour la rejeter. Ne jamais modifier directement une proposition à la place de ce flux.

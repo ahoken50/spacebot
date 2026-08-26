@@ -9,7 +9,8 @@ description: Créer et exécuter des scripts Python locaux, ou rechercher une co
 
 1. Lister les compétences installées avec `skills_search(action="installed")`, puis lire seulement celles qui sont pertinentes.
 2. Vérifier les MCP, gabarits, scripts locaux et binaires disponibles avant de créer ou rechercher quoi que ce soit.
-3. Réutiliser une capacité existante lorsque l’écart est mineur. Décrire le résultat attendu, les entrées, les sorties, les sources et les critères de vérification avant de créer un script.
+3. Cette compétence est une procédure, pas un outil MCP : ne jamais appeler un outil nommé `oasis_python_workbench`. Utiliser les outils `File` pour créer le script, puis le terminal sandboxé pour l’exécuter.
+4. Réutiliser une capacité existante lorsque l’écart est mineur. Décrire le résultat attendu, les entrées, les sorties, les sources et les critères de vérification avant de créer un script.
 
 ## Créer un script local
 
@@ -18,7 +19,8 @@ description: Créer et exécuter des scripts Python locaux, ou rechercher une co
 3. Privilégier la bibliothèque standard. Ne pas installer de paquet, lancer `pip`, créer un environnement virtuel ou télécharger du code sans proposition et approbation explicite.
 4. Fournir des arguments explicites, valider les chemins et formats, produire des messages d’erreur utiles, écrire les sorties de façon atomique et conserver une trace d’exécution courte.
 5. Tester au minimum avec `python3 -m py_compile <script>` et un essai non destructif sur un échantillon admissible. Ne jamais écraser une source officielle ou un livrable approuvé.
-6. Enregistrer dans la mémoire commune le rôle du script, les sources, le chemin, l’essai et les limites lorsqu’il influence un livrable ou une décision.
+6. Si le terminal sandboxé retourne `bwrap` ou `Operation not permitted`, ne pas répéter la même commande ni contourner le sandbox; consigner le blocage avec l’erreur exacte et poursuivre par les outils MCP disponibles.
+7. Enregistrer dans la mémoire commune avec `oasis_shared_memory_save_shared_record` le rôle du script, les sources, le chemin, l’essai et les limites lorsqu’il influence un livrable ou une décision.
 
 ## Rechercher une compétence manquante
 

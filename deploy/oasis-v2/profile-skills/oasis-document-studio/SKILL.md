@@ -11,13 +11,14 @@ related_skills: [oasis-reporting, oasis-financial-control, oasis-pse-sig]
 
 Pour tout document important, suivre impérativement cette séquence :
 
-1. Créer un manifeste avec `create_document_brief` : objectif, destinataire, sections, sources et formats attendus.
-2. Rédiger un brouillon Markdown cohérent dans `livrables/brouillons/`. Utiliser des titres hiérarchisés, des tableaux pour les résultats, et des références de source vérifiables.
-3. Ne jamais inventer un montant, une date, une décision, une superficie ou un résultat. Utiliser `À valider` et consigner l’information manquante dans la mémoire commune.
-4. Appeler `render_markdown_document` pour créer le DOCX et/ou le PDF avec la charte OASIS. Le rendu est réalisé localement par Pandoc et LibreOffice; le document source n’est pas transmis à un moteur de rendu externe.
-5. Appeler `check_document_quality`. Corriger tout avertissement avant de présenter le livrable comme prêt.
-6. Appeler `render_document_preview` et examiner visuellement au minimum la page titre, les tableaux larges, les pages contenant figures ou images, et la dernière page.
-7. Enregistrer dans la mémoire partagée le chemin du livrable, les sources, la version, le résultat du contrôle qualité et le statut d’approbation.
+1. Créer un manifeste avec `oasis_document_studio_create_document_brief` : objectif, destinataire, sections, sources et formats attendus.
+2. Utiliser uniquement des chemins **relatifs** à l’espace documentaire, par exemple `01_sources/00_inbox/fichier.docx` ou `07_livrables/01_brouillons/note.md`; ne jamais transmettre un chemin commençant par `/data/shared-workspace/`.
+3. Rédiger un brouillon Markdown cohérent dans `07_livrables/01_brouillons/`. Utiliser des titres hiérarchisés, des tableaux pour les résultats, et des références de source vérifiables.
+4. Ne jamais inventer un montant, une date, une décision, une superficie ou un résultat. Utiliser `À valider` et consigner l’information manquante dans la mémoire commune avec `oasis_shared_memory_save_shared_record`.
+5. Appeler `oasis_document_studio_render_markdown_document` pour créer le DOCX et/ou le PDF avec la charte OASIS. Le rendu est réalisé localement par Pandoc et LibreOffice; le document source n’est pas transmis à un moteur de rendu externe.
+6. Appeler `oasis_document_studio_check_document_quality`. Corriger tout avertissement avant de présenter le livrable comme prêt.
+7. Appeler `oasis_document_studio_render_document_preview` et examiner visuellement au minimum la page titre, les tableaux larges, les pages contenant figures ou images, et la dernière page.
+8. Enregistrer dans la mémoire partagée le chemin relatif du livrable, les sources, la version, le résultat du contrôle qualité et le statut d’approbation.
 
 ## Règles de qualité
 

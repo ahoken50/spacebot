@@ -7,14 +7,14 @@ description: Évaluer et proposer des améliorations d’instructions avec la bo
 
 ## Conditions avant exécution
 
-Utiliser `optimizer_status`, puis `optimizer_validate_reference_pack`. N’exécuter aucune optimisation si le jeu de référence n’est pas présent, approuvé, dépersonnalisé et représentatif. Ne jamais verser une pièce municipale, une donnée personnelle, une clé ou un rapport réel dans les cas de référence.
+Utiliser `oasis_supervised_optimizer_optimizer_status`, puis `oasis_supervised_optimizer_optimizer_validate_reference_pack`. N’exécuter aucune optimisation si le jeu de référence n’est pas présent, approuvé, dépersonnalisé et représentatif. Ne jamais verser une pièce municipale, une donnée personnelle, une clé ou un rapport réel dans les cas de référence.
 
 Créer ou mettre à jour les cas seulement après approbation humaine. Chaque cas définit un objectif, une instruction de base, une entrée réduite et une métrique vérifiable : termes indispensables, assertions interdites, marqueurs de source, longueur maximale, conformité de gabarit ou résultat déterministe d’un outil local.
 
 ## Boucle autorisée
 
-1. Vérifier les plafonds de cas, de candidats et d’appels dans `optimizer_status`.
-2. Exécuter `optimizer_propose` avec **un candidat** par défaut. La sortie est une proposition `pending_approval`, jamais un changement de production.
+1. Vérifier les plafonds de cas, de candidats et d’appels dans `oasis_supervised_optimizer_optimizer_status`.
+2. Exécuter `oasis_supervised_optimizer_optimizer_propose` avec **un candidat** par défaut. La sortie est une proposition `pending_approval`, jamais un changement de production.
 3. Examiner le score moyen, les résultats par cas, les sorties, les instructions proposées, les erreurs et le coût prévu. Ne retenir une amélioration que si elle augmente une métrique pertinente sans perdre les exigences de preuve, d’approbation ou de confidentialité.
 4. Classer la proposition sous `00_systeme/optimisation/propositions/` et enregistrer sa synthèse dans la mémoire commune avec `pending_approval`.
 5. Demander une revue humaine avant tout changement versionné d’instructions, de compétences, de modèle, d’outil, de MCP, de permissions ou de paramètres.

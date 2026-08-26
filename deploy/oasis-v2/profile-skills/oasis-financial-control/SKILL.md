@@ -9,9 +9,9 @@ related_skills: [oasis-reporting, oasis-schedule-governance]
 
 ## Préparer le contrôle
 
-1. Consulter d’abord la convention, le budget approuvé et le registre partagé avec `search_shared_memory`.
+1. Consulter d’abord la convention, le budget approuvé et le registre partagé avec `oasis_shared_memory_search_shared_memory`.
 2. Distinguer explicitement **prévision**, **engagement**, **dépense payée**, **part OASIS**, **part Ville/autres** et **admissibilité**.
-3. Enregistrer chaque constat vérifiable dans la mémoire partagée avec les noms de fichiers, les onglets, les numéros de pièces et le statut de validation.
+3. Enregistrer chaque constat vérifiable avec `oasis_shared_memory_save_shared_record`, en indiquant les noms de fichiers, les onglets, les numéros de pièces et le statut de validation.
 
 ## Gérer les transactions
 

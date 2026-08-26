@@ -72,6 +72,8 @@ for agent in agents:
     assert tool_names == expected_agent_mcp[agent['id']], f'MCP ciblés incorrects pour {agent["id"]}: {tool_names}'
 coordination = next(agent for agent in agents if agent['id'] == 'oasis-coordination')
 assert coordination['browser']['enabled'] is True
+assert '- SYS_ADMIN' in compose, 'Bubblewrap nécessite SYS_ADMIN pour créer son espace de montage isolé.'
+assert 'no-new-privileges:true' in compose and 'cap_drop:\n      - ALL' in compose, 'Le conteneur principal doit conserver no-new-privileges et supprimer les capacités non requises.'
 for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:', 'oasis-failure-remediator:', 'oasis-approval-bridge:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
@@ -152,6 +154,26 @@ python_skill = ROOT / 'profile-skills' / 'oasis-python-workbench' / 'SKILL.md'
 python_scaffold = ROOT / 'profile-skills' / 'oasis-python-workbench' / 'scripts' / 'scaffold_oasis_python_script.py'
 assert python_skill.is_file() and python_scaffold.is_file(), 'La compétence Python et son générateur sont requis.'
 assert 'python3 -m py_compile' in python_skill.read_text(encoding='utf-8'), 'La compétence Python doit exiger une compilation de contrôle.'
+skill_texts = '\n'.join(path.read_text(encoding='utf-8') for path in (ROOT / 'skills').rglob('SKILL.md'))
+skill_texts += '\n'.join(path.read_text(encoding='utf-8') for path in (ROOT / 'profile-skills').rglob('SKILL.md'))
+for raw_tool in (
+    'search_shared_memory', 'get_shared_record', 'shared_memory_status',
+    'classify_workspace_document', 'create_document_brief', 'render_markdown_document',
+    'render_document_preview', 'check_document_quality', 'inspect_kml', 'export_kml_geojson',
+    'project_surface_analysis', 'optimizer_status', 'optimizer_validate_reference_pack',
+    'optimizer_propose', 'skillopt_status', 'skillopt_validate_reference_pack',
+    'reference_miner_status', 'reference_miner_validate_policy',
+    'reference_miner_discover_candidates', 'reference_miner_autonomous_cycle',
+):
+    assert f'`{raw_tool}`' not in skill_texts, f'Le nom MCP doit être préfixé : {raw_tool}'
+for expected_tool in (
+    'oasis_shared_memory_search_shared_memory', 'oasis_shared_memory_save_shared_record',
+    'oasis_document_studio_classify_workspace_document', 'oasis_document_studio_check_document_quality',
+    'oasis_gis_local_inspect_kml', 'oasis_supervised_optimizer_optimizer_status',
+    'oasis_skillopt_skillopt_status', 'oasis_reference_miner_reference_miner_status',
+):
+    assert expected_tool in skill_texts, f'Outil MCP préfixé absent des compétences : {expected_tool}'
+assert 'chemins **relatifs**' in skill_texts and '/data/shared-workspace/...' in skill_texts, 'Les compétences documentaires doivent exiger des chemins relatifs.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
 assert bootstrap.count('oasis-python-workbench') == 6, 'La compétence Python doit être préchargée pour les six profils.'
 assert 'workspace/skills' in bootstrap and 'approved-skill-overlays' in bootstrap, 'Les compétences de profil et recouvrements approuvés doivent être préparés dans les workspaces privés.'
