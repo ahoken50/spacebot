@@ -1,89 +1,84 @@
-# Project Hub municipal — Ville de Val-d’Or
+# Autonomous Task Hub
 
-**Project Hub** est une instance locale Spacebot conçue comme outil complémentaire du coordonnateur en environnement de la Ville de Val-d’Or. Elle peut soutenir la gestion, la recherche, l’analyse et la préparation de livrables pour tout projet municipal : environnement, territoire, infrastructures, climat, consultations, études, partenariats, subventions ou dossiers interservices.
+**Autonomous Task Hub** est une instance locale Docker de Spacebot pour comprendre une demande, la découper, mobiliser les expertises utiles, produire des artefacts de travail et améliorer continuellement ses capacités locales. Elle s’adresse à tout type de tâche : recherche, analyse, planification, traitement de données, automatisation, programmation, rédaction et contrôle qualité.
 
-> Project Hub prépare des recherches, matrices et **brouillons**. Il ne remplace ni le greffe, ni les affaires juridiques, ni une direction, ni le conseil. Il ne dépose, signe, envoie, publie ni adopte aucun document.
+Le système conserve ses conversations et sa mémoire commune dans PostgreSQL + pgvector. Le routage passe exclusivement par OpenRouter; aucun modèle Claude n’est configuré. Les données et documents restent dans le répertoire local `instance/`, monté dans les conteneurs.
 
-## Profils spécialisés
+## Équipe adaptative
 
-| Profil | Mandat principal | Production attendue |
+Les rôles sont des capacités disponibles et non un parcours rigide. L’orchestrateur choisit les profils utiles selon la demande, réattribue les sous-tâches lorsque les preuves changent et limite le nombre de branches au travail réellement indépendant.
+
+| Profil | Mission principale | Production attendue |
 | --- | --- | --- |
-| Coordonnateur municipal de projets | Qualification, plan, délégation et consolidation | Plan de travail et dossier intégré |
-| Finance et administration | Budget, dépenses, contrats et approvisionnement | Écarts sourcés et fiche financière |
-| Planification | Échéancier, dépendances, risques et Gantt | Calendrier vérifiable |
-| Analyse et géomatique | Données, indicateurs, méthodes et SIG | Analyse reproductible et limites |
-| Rédaction et livrables | Rapports, notes et contrôle qualité | Brouillon clair et sourcé |
-| Gouvernance | Réunions, ordres du jour, procès-verbaux et suivis | Registre d’actions et décisions |
-| Subventions et partenariats | Appels, critères, calendrier et préparation | Fiche d’opportunité à valider |
-| Veille réglementaire municipale | Sources, incidences possibles, règlements et politiques | Matrice de revue, jamais avis juridique |
+| Orchestrateur adaptatif | Qualification, plan, délégation, consolidation et prochaine action | Plan de travail vérifiable |
+| Chercheur et analyste de sources | Recherche, faits, options et incertitudes | Dossier de preuves sourcé |
+| Planificateur et gestionnaire d’exécution | Dépendances, jalons, risques et reprise | Séquence de travail exploitable |
+| Analyste de données et de raisonnement | Méthodes, calculs et cohérence | Analyse reproductible |
+| Ingénieur d’automatisation | Scripts, outils locaux et tests | Automatisation documentée |
+| Rédacteur de livrables | Documents, synthèses et brouillons | Livrable structuré |
+| Réviseur critique | Contradictions, omissions, critères et limites | Revue de qualité |
+| Analyste d’apprentissage et de qualité | Cas de référence, DSPy, SkillOpt et leçons | Proposition ou amélioration mesurée |
 
-Chaque profil a un workspace privé et un accès sandboxé au seul espace documentaire partagé. La coordination, les subventions et la veille réglementaire disposent d’une navigation contrôlée pour les sources publiques. Le routage est exclusivement OpenRouter; aucun modèle Claude n’est configuré.
+## Autonomie réelle
 
-## Veille municipale quotidienne
+Le niveau `act` de Spacebot est activé. Toutes les quinze minutes, l’orchestrateur examine les objectifs, la mémoire, les tâches, les blocages et les résultats précédents. Il peut enrichir les tâches non encore exécutables, créer des suivis, lancer les tâches prêtes, réorganiser le plan et déléguer des analyses indépendantes. Les cycles autonomes conservent un résumé durable, de sorte que la suite de travail ne recommence pas au même point.
 
-Le service `project-municipal-watch` relève à intervalle quotidien les seules URL déclarées dans une politique locale explicitement approuvée. Il compare une empreinte du contenu, conserve une fiche dépersonnalisée et crée une proposition lorsqu’un changement est détecté après la première référence. Il n’appelle aucun LLM.
+La boucle de remédiation dépersonnalise et déduplique les échecs persistants. Elle crée une leçon ou une demande de capacité, puis empêche la répétition d’une tentative sans différence explicite de plan. Le mineur de références extrait uniquement des tâches terminées, approuvées et marquées `learning_eligible=true`; DSPy et SkillOpt évaluent des candidates dans des partitions séparées, avec des plafonds de coût OpenRouter.
 
-Le pont d’approbation transforme cette proposition en tâche `pending_approval` dans Spacebot. **Approve** consigne seulement que la fiche a été examinée; il ne modifie aucun règlement, aucune politique, aucun permis, aucune subvention, aucun courriel ni aucune configuration. **Dismiss** conserve le dossier comme non retenu.
+## Auto-évolution locale
 
-Les sources initiales proposées couvrent LégisQuébec pour la LQE, la Loi sur les compétences municipales et la LAU, la Ville de Val-d’Or, la MRC de La Vallée-de-l’Or, les concours FRQ et les portails fédéraux de financement. LégisQuébec est la source du texte officiel consolidé; le SAD de la MRCVO doit être traité comme document territorial versionné et limité à son périmètre.[1] [2] [3] [4]
+Les agents peuvent améliorer automatiquement les scripts placés dans `05_automatisation/01_scripts/`. Une correction locale doit comporter une empreinte de la version de départ, le contenu complet candidat, sa justification et ses contraintes. Le service `project-local-code-improver` vérifie le type de fichier, limite le chemin au workspace, valide la syntaxe, sauvegarde la version précédente, applique la correction de manière atomique et écrit un audit. Une candidate invalide ou fondée sur une version dépassée est conservée sans écraser le fichier en place.
 
-### Activer la veille
+Le même protocole d’évolution sert de cadre aux compétences, aux dépendances déclarées, aux fichiers Docker et aux MCP : provenance identifiée, changement local explicitement décrit, validation automatisée, journal et retour arrière. Les actions externes et irréversibles demeurent exclues du flux automatique.
 
-Après le bootstrap, examinez la politique initiale :
+> Les agents peuvent travailler et améliorer l’environnement local de façon autonome. Ils ne transmettent toutefois pas de contenu, ne publient pas, n’achètent pas, n’exposent pas de secret, ne modifient pas les permissions et n’accèdent pas à une ressource externe non fournie sans décision explicite du responsable.
 
-```text
-instance/shared-workspace/00_systeme/veille-municipale/
-municipal_watch_policy.template.json
-```
-
-Puis créez la politique approuvée :
+## Installation locale
 
 ```bash
-cd /srv/spacebot-project-hub/deploy/project-hub
-cp instance/shared-workspace/00_systeme/veille-municipale/municipal_watch_policy.template.json \
-   instance/shared-workspace/00_systeme/veille-municipale/municipal_watch_policy.approved.json
-```
-
-Dans ce fichier local, fixez `status` à `approved`, `allow_municipal_watch` à `true`, conservez tous les champs d’action automatique à `false`, puis activez seulement les sources correspondant au mandat. La première exécution crée une référence de base; les changements ultérieurs se trouvent dans `00_systeme/veille-municipale/proposals/` et deviennent des tâches d’examen Web.
-
-## Subventions, réglementation et rédaction administrative
-
-L’agent Subventions peut relever les appels institutionnels, comparer les critères publiés, établir un calendrier et préparer une fiche de décision. Une opportunité repérée ne confirme jamais l’admissibilité : le porteur, le territoire, les coûts, le cumul, les partenaires, les échéances et les règles du programme doivent être validés humainement. Les portails fédéraux identifient les IRSC, le CRSNG, le CRSH et la FCI; la page et les documents de chaque programme restent la référence.[5]
-
-L’agent réglementaire distingue le texte officiel, la page administrative, le règlement municipal, le document de planification et l’analyse de travail. Il prépare des matrices d’incidences, des brouillons de règlement et des politiques environnementales. La LQE vise notamment la protection de l’environnement; la Loi sur les compétences municipales comporte des pouvoirs municipaux en environnement, mais un règlement municipal incompatible avec une norme supérieure est inopérant.[1] [2]
-
-Les compétences de rédaction contiennent des gabarits pour les notes de réunion, ordres du jour, projets de procès-verbal, notes de service et fiches aux élus, brouillons de courriel, politiques environnementales et projets de règlement. Tout commence dans `07_livrables/01_brouillons/`. Un procès-verbal demeure un projet jusqu’à sa validation prévue; un courriel ne sera jamais envoyé par l’agent.
-
-## Démarrage Docker local
-
-```bash
-cd /srv/spacebot-project-hub
-git pull --ff-only origin feat/generic-project-hub
-
-cd deploy/project-hub
+git clone --branch feat/autonomous-task-hub https://github.com/ahoken50/spacebot.git /srv/autonomous-task-hub
+cd /srv/autonomous-task-hub/deploy/project-hub
 cp .env.example .env
-# Renseigner OPENROUTER_API_KEY, PROJECT_HUB_MEMORY_DB_PASSWORD,
-# PROJECT_HUB_MEMORY_EXPORT_TOKEN, PROJECT_HUB_AUTONOMOUS_PIPELINE_TOKEN,
-# PROJECT_HUB_APPROVAL_BRIDGE_TOKEN, PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN
-# et PROJECT_HUB_MUNICIPAL_WATCH_TOKEN avec des valeurs locales fortes.
 chmod 600 .env
+```
 
+Renseignez dans `.env` votre clé OpenRouter, le mot de passe PostgreSQL et les jetons internes. Générez les jetons localement, par exemple avec `openssl rand -hex 32`, puis initialisez et démarrez l’instance.
+
+```bash
 ./bootstrap_instance.sh
 docker compose up -d --build
 docker compose ps
-docker compose logs --tail=100 project-municipal-watch project-approval-bridge
 ```
 
-L’interface locale est disponible sur <http://127.0.0.1:19898>. Le port reste lié à `localhost`; une exposition réseau exige un proxy HTTPS authentifié. Sauvegarder ensemble `instance/` et `volumes/postgres/` selon les règles de conservation applicables.
+L’interface Web est disponible uniquement sur `http://127.0.0.1:19898`. Pour consulter les services autonomes :
 
-## Références
+```bash
+docker compose logs --tail=100 \
+  spacebot-project-hub \
+  project-failure-remediator \
+  project-reference-miner \
+  project-local-code-improver
+```
 
-[1] [LégisQuébec — Loi sur la qualité de l’environnement, Q-2](https://legisquebec.gouv.qc.ca/fr/showdoc/cs/q-2)
+## Arborescence de travail
 
-[2] [LégisQuébec — Loi sur les compétences municipales, C-47.1](https://www.legisquebec.gouv.qc.ca/fr/document/lc/C-47.1)
+```text
+instance/shared-workspace/
+├── 01_sources/                 # Pièces d’entrée, références et données
+├── 02_recherche/               # Questions, preuves et options
+├── 03_planification/           # Objectifs, plan et risques
+├── 04_analyse/                 # Méthodes, données et calculs
+├── 05_automatisation/          # Scripts, tests et résultats locaux
+├── 06_communications/          # Notes, brouillons et révisions
+├── 07_livrables/               # Brouillons, QA, approuvés et transmis
+├── 08_archives/                # Versions remplacées et journaux
+└── 00_systeme/optimisation/    # DSPy, SkillOpt, remédiation et auto-évolution
+```
 
-[3] [LégisQuébec — Loi sur l’aménagement et l’urbanisme, A-19.1](https://www.legisquebec.gouv.qc.ca/fr/document/lc/A-19.1)
+Déposez les nouvelles pièces dans `01_sources/00_inbox/`. Les agents classent ensuite les fichiers avec la taxonomie locale, enregistrent leurs sources et créent des artefacts reproductibles.
 
-[4] [MRC de La Vallée-de-l’Or — Schéma d’aménagement et de développement](https://mrcvo.qc.ca/territoire/schema-damenagement-et-de-developpement/)
+## Contrôles et coûts
 
-[5] [Science Canada — Financement interorganismes de la recherche](https://science.gc.ca/site/science/fr/financement-interorganismes-recherche)
+Les modèles les moins coûteux assurent la coordination, les workers et les extractions structurées; le modèle de raisonnement est réservé aux tâches complexes. Les boucles DSPy et SkillOpt ont des plafonds de cas, d’appels, de jetons, de temps et d’exécutions quotidiennes, modifiables dans `.env`.
+
+Les tests intégrés vérifient la configuration, le bootstrap, la syntaxe des services, la déduplication des échecs, les packs d’apprentissage et l’application atomique d’une amélioration de code locale. La validation Docker complète doit être effectuée sur l’hôte Linux qui exécutera l’instance.

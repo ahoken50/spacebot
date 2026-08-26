@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "status": "draft",
-  "purpose": "Gabarit de cas de référence dépersonnalisés pour l’optimisation supervisée. Ne pas inclure de pièces municipales confidentielles ni de données personnelles.",
+  "purpose": "Gabarit de cas de référence dépersonnalisés pour l’optimisation supervisée. Ne pas inclure de pièces confidentielles ni de données personnelles.",
   "approved_by": null,
   "approved_at": null,
   "cases": [

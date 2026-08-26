@@ -1,6 +1,6 @@
 ---
 name: project-finance-control
-description: Suivi financier et administratif de projet : budget, dépenses, contrats, financement, admissibilité et écarts. Utiliser pour tout projet municipal ou de recherche nécessitant une trace financière vérifiable.
+description: Suivi financier et administratif de projet : budget, dépenses, contrats, financement, admissibilité et écarts. Utiliser pour tout projet nécessitant une trace financière vérifiable nécessitant une trace financière vérifiable.
 tags: [projet, budget, dépenses, contrats, financement, conformité]
 related_skills: [project-reporting, project-planning-governance]
 ---

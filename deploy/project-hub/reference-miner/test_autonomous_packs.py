@@ -39,7 +39,7 @@ def main() -> None:
             "schema_version": "1.0", "status": "system_validated", "autonomous_generated": True,
             "redacted": True, "scope": "instruction_appendix_only", "auto_execute": True,
             "cases": [{
-                "id": "AUTO-DSPY-001", "agent_id": "project-coordination",
+                "id": "AUTO-DSPY-001", "agent_id": "task-orchestrator",
                 "task_input": "Préparer une synthèse dépersonnalisée avec sa source.",
                 "baseline_instruction": "Citer la source et ne rien inventer.", "expected": EXPECTED,
                 "source_record_id": "00000000-0000-0000-0000-000000000001", "source_references": ["registre:test"],
@@ -56,7 +56,7 @@ def main() -> None:
         skillopt_pack.write_text(json.dumps({
             "schema_version": "1.0", "status": "system_validated", "autonomous_generated": True,
             "redacted": True, "scope": "skill_text_only", "autonomous_learning": True,
-            "skill_id": "project-finance-control",
+            "skill_id": "task-self-evaluation",
             "training_cases": [cases[0]], "validation_cases": [cases[1]], "holdout_cases": [cases[2]],
         }, ensure_ascii=False), encoding="utf-8")
         base_env = os.environ | {

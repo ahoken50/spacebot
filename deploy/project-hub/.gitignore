@@ -7,4 +7,4 @@ volumes/
 *.log
 *.tmp
 
-# Le gabarit de configuration et les profils sont versionnés; les documents municipaux ne le sont pas.
+# Le gabarit de configuration et les profils sont versionnés; les données de travail locales ne le sont pas.

@@ -1,13 +1,13 @@
 ---
 name: project-supervised-optimization
-description: Évaluer et proposer des améliorations d’instructions avec la boucle DSPy locale sous supervision humaine. Utiliser pour améliorer un profil Project Hub après des tâches répétables et vérifiables.
+description: Évaluer et proposer des améliorations d’instructions avec la boucle DSPy locale sous supervision humaine. Utiliser pour améliorer un profil Autonomous Task Hub après des tâches répétables et vérifiables.
 ---
 
-# Optimisation supervisée Project Hub
+# Optimisation supervisée Autonomous Task Hub
 
 ## Conditions avant exécution
 
-Utiliser `optimizer_status`, puis `optimizer_validate_reference_pack`. N’exécuter aucune optimisation si le jeu de référence n’est pas présent, approuvé, dépersonnalisé et représentatif. Ne jamais verser une pièce municipale, une donnée personnelle, une clé ou un rapport réel dans les cas de référence.
+Utiliser `optimizer_status`, puis `optimizer_validate_reference_pack`. N’exécuter aucune optimisation si le jeu de référence n’est pas présent, approuvé, dépersonnalisé et représentatif. Ne jamais verser une pièce confidentielle, une donnée personnelle, une clé ou un rapport réel dans les cas de référence.
 
 Créer ou mettre à jour les cas seulement après approbation humaine. Chaque cas définit un objectif, une instruction de base, une entrée réduite et une métrique vérifiable : termes indispensables, assertions interdites, marqueurs de source, longueur maximale, conformité de gabarit ou résultat déterministe d’un outil local.
 

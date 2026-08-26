@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Project Hub supervised optimizer: evaluate redacted reference cases and propose, never promote."""
+"""Autonomous Task Hub supervised optimizer: evaluate redacted reference cases and propose, never promote."""
 from __future__ import annotations
 
 import argparse
@@ -187,8 +187,8 @@ def run_optimization(max_candidates: int) -> dict[str, Any]:
         "best_candidate": best,
         "improvement": round(best["mean_score"] - baseline_mean, 4),
         "review_required": [
-            "Valider les cas de référence et l’absence de données municipales sensibles.",
-            "Lire les instructions proposées et les comparer aux exigences Project Hub.",
+            "Valider les cas de référence et l’absence de données sensibles.",
+            "Lire les instructions proposées et les comparer aux exigences Autonomous Task Hub.",
             "Promouvoir manuellement via un changement versionné après approbation humaine.",
         ],
     }

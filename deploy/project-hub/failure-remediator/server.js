@@ -13,8 +13,8 @@ const enabled = !['0', 'false', 'no', 'off'].includes((process.env.PROJECT_HUB_F
 const intervalSeconds = Math.max(30, Number.parseInt(process.env.PROJECT_HUB_FAILURE_REMEDIATOR_INTERVAL_SECONDS ?? '120', 10) || 120);
 const maxProposalsPerDay = Math.max(1, Number.parseInt(process.env.PROJECT_HUB_FAILURE_REMEDIATOR_MAX_PROPOSALS_PER_DAY ?? '3', 10) || 3);
 const serviceToken = process.env.PROJECT_HUB_FAILURE_REMEDIATOR_TOKEN ?? '';
-const ownerAgentId = 'project-coordination';
-const allowedAgents = new Set(['project-coordination', 'project-finance', 'project-planning', 'project-analysis', 'project-reporting', 'project-governance', 'project-grants', 'project-regulatory']);
+const ownerAgentId = 'task-orchestrator';
+const allowedAgents = new Set(['task-orchestrator', 'task-research', 'task-planning', 'task-analysis', 'task-automation', 'task-writing', 'task-review', 'task-learning']);
 const actionableOutcomes = new Set(['failed', 'blocked', 'timed_out']);
 
 const remediationRoot = path.join(workspace, '00_systeme', 'optimisation', 'failure-remediator');
@@ -72,18 +72,18 @@ function normalizedFailureText(task, attempt) {
 
 function classifyFailure(task, attempt) {
   const text = normalizedFailureText(task, attempt);
-  if (/(?:mcp|model context protocol).{0,80}(?:not found|unknown|missing|unavailable|refused|failed)|(?:connection refused|econnrefused).{0,80}(?:3010|3011|3012|3013|3014|3015)/i.test(text)) {
+  if (/(?:mcp|model context protocol).{0,80}(?:not found|unknown|missing|unavailable|refused|failed)|(?:connection refused|econnrefused).{0,80}(?:3010|3011|3012|3013|3014|3015|3019|3020)/i.test(text)) {
     return {
       category: 'missing_or_unavailable_mcp',
       disposition: 'capability_request',
-      remediation: 'Ne pas simuler le résultat du MCP. Vérifier les MCP préchargés, consigner le nom et l’erreur, puis demander une capacité approuvée si aucun outil existant ne couvre le besoin.',
+      remediation: 'Ne pas simuler le résultat du MCP. Vérifier les MCP préchargés, consigner le nom et l’erreur, puis préparer un changement MCP local typé avec provenance, validation automatique, audit et retour arrière si aucun outil existant ne couvre le besoin.',
     };
   }
   if (/(?:outil|tool).{0,80}(?:not found|unknown|missing|unavailable|not available)|(?:no such tool|unknown function)/i.test(text)) {
     return {
       category: 'missing_tool',
       disposition: 'capability_request',
-      remediation: 'Vérifier d’abord les outils et compétences déjà chargés. Ne pas contourner les permissions ni installer un outil. Préparer une demande de capacité qui précise le résultat, les données et le moindre privilège requis.',
+      remediation: 'Vérifier d’abord les outils et compétences déjà chargés. Si aucun outil ne convient, préparer une évolution locale typée de dépendance avec version exacte, provenance, test reproductible, audit et retour arrière.',
     };
   }
   if (/(?:compétence|skill).{0,80}(?:not found|unknown|missing|unavailable)|(?:no skill|skill unavailable)/i.test(text)) {
@@ -139,7 +139,7 @@ function proposalInstructions({ task, attempt, classification, signature }) {
     '',
     '## Limites',
     '',
-    'Ne pas modifier la configuration, les modèles, les MCP, Docker, les permissions ou les données sources. Ne pas relancer une tâche échouée sans une différence explicite de plan et une validation humaine lorsque nécessaire.',
+    'Ne pas relancer une tâche échouée sans une différence explicite de plan. Les scripts, dépendances déclarées, Docker et MCP locaux peuvent évoluer via leur contrôleur typé, avec sauvegarde, validation automatisée, audit et retour arrière; ne pas modifier les secrets, permissions ou données sources.',
     '',
   ].join('\n');
 }

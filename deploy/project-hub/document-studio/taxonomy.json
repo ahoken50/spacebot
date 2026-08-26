@@ -1,73 +1,60 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "root": "/workspace",
   "principles": [
     "Conserver les documents originaux sans modification.",
     "Classer toute nouvelle pièce à partir de 01_sources/00_inbox.",
     "Conserver séparément les brouillons, les révisions, les versions approuvées et les transmissions.",
-    "Enregistrer le chemin final, le statut et les sources dans la mémoire partagée."
+    "Enregistrer le chemin final, le statut, les sources, les hypothèses et les preuves de test dans la mémoire partagée."
   ],
   "categories": {
     "source": {
-      "label": "Sources, cadre et données d’entrée",
+      "label": "Sources et données d’entrée",
       "folders": [
         "01_sources/00_inbox",
-        "01_sources/01_cadre_reference",
-        "01_sources/02_donnees_et_resultats",
-        "01_sources/03_documents_administratifs",
-        "01_sources/04_donnees_geospatiales"
+        "01_sources/01_references",
+        "01_sources/02_donnees",
+        "01_sources/03_documents"
       ]
     },
-    "finance": {
-      "label": "Finances et administration",
+    "research": {
+      "label": "Recherche et preuves",
       "folders": [
-        "02_finances/01_budget",
-        "02_finances/02_engagements",
-        "02_finances/03_depenses",
-        "02_finances/04_contrats_approvisionnement",
-        "02_finances/05_controles_ecarts"
+        "02_recherche/01_questions",
+        "02_recherche/02_preuves",
+        "02_recherche/03_options"
       ]
     },
     "planning": {
       "label": "Planification et risques",
       "folders": [
-        "03_planification/01_cadre_approuve",
+        "03_planification/01_objectifs",
         "03_planification/02_plan_travail",
-        "03_planification/03_gantt",
-        "03_planification/04_jalons_risques"
+        "03_planification/03_jalons_risques"
       ]
     },
     "analysis": {
-      "label": "Analyses, méthodes et données géospatiales",
+      "label": "Analyses et méthodes",
       "folders": [
         "04_analyse/01_methodes",
         "04_analyse/02_donnees",
-        "04_analyse/03_geospatiale",
-        "04_analyse/04_indicateurs",
-        "04_analyse/05_calculs_reproductibles"
+        "04_analyse/03_calculs_reproductibles"
       ]
     },
-    "governance": {
-      "label": "Gouvernance et parties prenantes",
+    "automation": {
+      "label": "Automatisations et tests",
       "folders": [
-        "05_gouvernance/01_mandat_parties_prenantes",
-        "05_gouvernance/02_convocations",
-        "05_gouvernance/03_ordres_du_jour",
-        "05_gouvernance/04_proces_verbaux",
-        "05_gouvernance/05_decisions_actions_risques"
+        "05_automatisation/01_scripts",
+        "05_automatisation/02_tests",
+        "05_automatisation/03_resultats"
       ]
     },
-    "reporting": {
-      "label": "Rapports et synthèses",
+    "communication": {
+      "label": "Notes et communications de travail",
       "folders": [
-        "06_rapports_et_syntheses/01_notes",
-        "06_rapports_et_syntheses/02_rapports_intermediaires",
-        "06_rapports_et_syntheses/03_rapport_final",
-        "06_rapports_et_syntheses/04_annexes_preuves",
-        "06_rapports_et_syntheses/05_subventions",
-        "06_rapports_et_syntheses/06_reglementation",
-        "06_rapports_et_syntheses/07_politiques",
-        "06_rapports_et_syntheses/08_communications"
+        "06_communications/01_notes",
+        "06_communications/02_brouillons",
+        "06_communications/03_revisions"
       ]
     },
     "deliverable": {

@@ -51,7 +51,7 @@ function createServer() {
       {
         description: 'Exécuter une optimisation DSPy limitée sur des cas de référence approuvés. Produit seulement un candidat pending_approval dans 00_systeme/optimisation/propositions; ne modifie jamais la production.',
         inputSchema: {
-          confirm_approved_reference_pack: z.literal(true).describe('Confirmer que le jeu de référence est approuvé, dépersonnalisé et ne contient aucune pièce municipale confidentielle.'),
+          confirm_approved_reference_pack: z.literal(true).describe('Confirmer que le jeu de référence est approuvé, dépersonnalisé et ne contient aucune pièce confidentielle.'),
           max_candidates: z.number().int().min(1).max(2).default(1),
         },
       },

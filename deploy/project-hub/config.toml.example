@@ -1,18 +1,17 @@
-# Instance locale Docker générique pour le pilotage de projets municipaux ou de recherche.
+# Instance locale Docker d’assistance adaptative aux tâches.
 # Définir OPENROUTER_API_KEY dans .env. Aucun modèle Claude n’est configuré.
 
 [llm]
 openrouter_key = "env:OPENROUTER_API_KEY"
 
 [defaults]
-max_concurrent_branches = 1
-max_concurrent_workers = 1
-max_turns = 3
-branch_max_turns = 6
+max_concurrent_branches = 2
+max_concurrent_workers = 3
+max_turns = 6
+branch_max_turns = 10
 context_window = 96000
 history_backfill_count = 12
 worker_log_mode = "errors_only"
-# Adapter ces fuseaux au territoire du projet.
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
@@ -41,7 +40,7 @@ coding = "openrouter/openai/gpt-oss-120b"
 [defaults.opencode]
 enabled = true
 path = "/root/.bun/bin/opencode"
-max_servers = 1
+max_servers = 2
 server_startup_timeout_secs = 45
 max_restart_retries = 2
 
@@ -73,25 +72,26 @@ enabled = false
 message_interval = 100
 
 [defaults.skills.reflection]
-enabled = false
-min_tool_iterations = 20
-cooldown_secs = 14400
+enabled = true
+min_tool_iterations = 8
+cooldown_secs = 3600
 
 [defaults.cortex]
-tick_interval_secs = 900
-worker_wall_clock_timeout_secs = 600
+tick_interval_secs = 300
+worker_wall_clock_timeout_secs = 900
 circuit_breaker_threshold = 3
 
-# Toute décision financière, réglementaire, institutionnelle ou publication externe reste humaine.
+# Niveau maximal pris en charge par Spacebot : les tâches ready peuvent être exécutées,
+# les tâches pending_approval sont enrichies et les suites de travail sont proposées.
 [defaults.autonomy]
-level = "suggest"
-interval_secs = 14400
-max_turns = 4
-max_tasks_per_run = 1
-timeout_secs = 600
-warn_secs = 480
-run_history_count = 3
-claim_unowned = false
+level = "act"
+interval_secs = 900
+max_turns = 12
+max_tasks_per_run = 2
+timeout_secs = 720
+warn_secs = 600
+run_history_count = 6
+claim_unowned = true
 
 [defaults.browser]
 enabled = false
@@ -106,15 +106,15 @@ transport = "http"
 url = "http://project-shared-memory:3010/mcp"
 
 [[humans]]
-id = "project-sponsor"
-display_name = "Responsable municipal désigné"
-role = "Autorité d’approbation des orientations, engagements, livrables officiels, communications externes et changements durables."
-bio = "Valide les décisions sensibles, les livrables externes, les changements de budget, d’échéancier, de capacité et toute diffusion officielle."
+id = "task-owner"
+display_name = "Responsable de l’espace de travail"
+role = "Définit les priorités, approuve les tâches sensibles, les changements durables et toute communication ou publication externe."
+bio = "Conserve la décision finale sur les engagements, accès, dépenses, transmissions, changements de configuration et promotion d’apprentissages."
 
 [[agents]]
-id = "project-coordination"
-display_name = "Coordonnateur municipal de projets"
-role = "Point d’entrée Web du coordonnateur en environnement : qualification, planification, délégation, consolidation et demande d’approbation pour tout projet municipal."
+id = "task-orchestrator"
+display_name = "Orchestrateur adaptatif"
+role = "Point d’entrée : comprend la demande, produit un plan vérifiable, sélectionne les expertises utiles, délègue, consolide, évalue le résultat et crée les prochaines tâches nécessaires."
 default = true
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
@@ -150,9 +150,31 @@ transport = "http"
 url = "http://project-reference-miner:3015/mcp"
 
 [[agents]]
-id = "project-finance"
-display_name = "Analyste financier et administratif"
-role = "Budget, dépenses, contrats, approvisionnement, admissibilité, rapprochements et suivi des écarts."
+id = "task-research"
+display_name = "Chercheur et analyste de sources"
+role = "Recherche des sources fiables, extrait les faits, compare les options, qualifie les incertitudes et produit un dossier de preuves réutilisable."
+cron_timezone = "America/Toronto"
+user_timezone = "America/Toronto"
+
+[agents.sandbox]
+writable_paths = ["/data/shared-workspace"]
+
+[agents.browser]
+enabled = true
+headless = true
+evaluate_enabled = false
+persist_session = false
+close_policy = "close_tabs"
+
+[[agents.mcp]]
+name = "project_document_studio"
+transport = "http"
+url = "http://project-document-studio:3012/mcp"
+
+[[agents]]
+id = "task-planning"
+display_name = "Planificateur et gestionnaire d’exécution"
+role = "Découpe les objectifs, organise les dépendances, séquence le travail, suit les jalons, les risques, les blocages et les prochaines actions."
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
@@ -165,24 +187,9 @@ transport = "http"
 url = "http://project-document-studio:3012/mcp"
 
 [[agents]]
-id = "project-planning"
-display_name = "Planificateur de projet"
-role = "Échéancier, Gantt, jalons, dépendances, capacité, risques et contrôle des écarts."
-cron_timezone = "America/Toronto"
-user_timezone = "America/Toronto"
-
-[agents.sandbox]
-writable_paths = ["/data/shared-workspace"]
-
-[[agents.mcp]]
-name = "project_document_studio"
-transport = "http"
-url = "http://project-document-studio:3012/mcp"
-
-[[agents]]
-id = "project-analysis"
-display_name = "Analyste de données et géomatique"
-role = "Analyse de données, géomatique facultative, indicateurs, méthodes, calculs et validation méthodologique."
+id = "task-analysis"
+display_name = "Analyste de données et de raisonnement"
+role = "Traite les données, construit des méthodes reproductibles, réalise les calculs, détecte les incohérences et explicite les hypothèses."
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
@@ -200,9 +207,9 @@ transport = "http"
 url = "http://project-document-studio:3012/mcp"
 
 [[agents]]
-id = "project-reporting"
-display_name = "Rédacteur et analyste de livrables"
-role = "Rapports, notes décisionnelles, synthèses de recherche, annexes, conformité et contrôle de qualité rédactionnel."
+id = "task-automation"
+display_name = "Ingénieur d’automatisation"
+role = "Conçoit, écrit, teste et documente des scripts, transformations de données et outils locaux réversibles nécessaires à la tâche."
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
@@ -215,9 +222,9 @@ transport = "http"
 url = "http://project-document-studio:3012/mcp"
 
 [[agents]]
-id = "project-governance"
-display_name = "Secrétaire et analyste de gouvernance"
-role = "Comités, convocations, ordres du jour, procès-verbaux, décisions, responsables, risques et relances."
+id = "task-writing"
+display_name = "Rédacteur de livrables"
+role = "Prépare des documents structurés, synthèses, présentations de travail, courriels et procédures à partir des preuves disponibles, avec une revue de cohérence."
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
@@ -230,21 +237,14 @@ transport = "http"
 url = "http://project-document-studio:3012/mcp"
 
 [[agents]]
-id = "project-grants"
-display_name = "Analyste des subventions et partenariats"
-role = "Veille des appels de financement, fiches d’admissibilité à confirmer, calendrier de dépôt et préparation contrôlée des dossiers municipaux."
+id = "task-review"
+display_name = "Réviseur critique"
+role = "Vérifie l’atteinte des critères, les sources, les calculs, les omissions, les contradictions, les limites et la clarté avant clôture."
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
 [agents.sandbox]
 writable_paths = ["/data/shared-workspace"]
-
-[agents.browser]
-enabled = true
-headless = true
-evaluate_enabled = false
-persist_session = false
-close_policy = "close_tabs"
 
 [[agents.mcp]]
 name = "project_document_studio"
@@ -252,118 +252,103 @@ transport = "http"
 url = "http://project-document-studio:3012/mcp"
 
 [[agents]]
-id = "project-regulatory"
-display_name = "Analyste de veille réglementaire municipale"
-role = "Veille des sources officielles, matrice d’incidences, brouillons de règlements et politiques environnementales, avec revue humaine obligatoire des conclusions."
+id = "task-learning"
+display_name = "Analyste d’apprentissage et de qualité"
+role = "Transforme les tâches terminées et les échecs dépersonnalisés en cas de référence, évalue les améliorations et prépare des propositions d’instructions ou de compétences ciblées."
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
 [agents.sandbox]
 writable_paths = ["/data/shared-workspace"]
 
-[agents.browser]
-enabled = true
-headless = true
-evaluate_enabled = false
-persist_session = false
-close_policy = "close_tabs"
+[[agents.mcp]]
+name = "project_supervised_optimizer"
+transport = "http"
+url = "http://project-optimizer:3013/mcp"
 
 [[agents.mcp]]
-name = "project_document_studio"
+name = "project_skillopt"
 transport = "http"
-url = "http://project-document-studio:3012/mcp"
+url = "http://project-skillopt:3014/mcp"
+
+[[agents.mcp]]
+name = "project_reference_miner"
+transport = "http"
+url = "http://project-reference-miner:3015/mcp"
 
 [[links]]
-from = "project-sponsor"
-to = "project-coordination"
+from = "task-owner"
+to = "task-orchestrator"
 direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
-from = "project-coordination"
-to = "project-finance"
+from = "task-orchestrator"
+to = "task-research"
 direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
-from = "project-coordination"
-to = "project-planning"
+from = "task-orchestrator"
+to = "task-planning"
 direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
-from = "project-coordination"
-to = "project-analysis"
+from = "task-orchestrator"
+to = "task-analysis"
 direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
-from = "project-coordination"
-to = "project-reporting"
+from = "task-orchestrator"
+to = "task-automation"
 direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
-from = "project-coordination"
-to = "project-governance"
+from = "task-orchestrator"
+to = "task-writing"
 direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
-from = "project-coordination"
-to = "project-grants"
+from = "task-orchestrator"
+to = "task-review"
 direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
-from = "project-coordination"
-to = "project-regulatory"
+from = "task-orchestrator"
+to = "task-learning"
 direction = "two_way"
 kind = "hierarchical"
 
 [[links]]
-from = "project-finance"
-to = "project-reporting"
+from = "task-research"
+to = "task-analysis"
 direction = "two_way"
 kind = "peer"
 
 [[links]]
-from = "project-analysis"
-to = "project-reporting"
+from = "task-planning"
+to = "task-automation"
 direction = "two_way"
 kind = "peer"
 
 [[links]]
-from = "project-planning"
-to = "project-governance"
+from = "task-writing"
+to = "task-review"
 direction = "two_way"
 kind = "peer"
 
 [[links]]
-from = "project-grants"
-to = "project-finance"
-direction = "two_way"
-kind = "peer"
-
-[[links]]
-from = "project-grants"
-to = "project-reporting"
-direction = "two_way"
-kind = "peer"
-
-[[links]]
-from = "project-regulatory"
-to = "project-analysis"
-direction = "two_way"
-kind = "peer"
-
-[[links]]
-from = "project-regulatory"
-to = "project-governance"
+from = "task-review"
+to = "task-learning"
 direction = "two_way"
 kind = "peer"
 
 [[groups]]
-name = "Pilotage de projets"
-agent_ids = ["project-coordination", "project-finance", "project-planning", "project-analysis", "project-reporting", "project-governance", "project-grants", "project-regulatory"]
-color = "#0F766E"
+name = "Assistance adaptative"
+agent_ids = ["task-orchestrator", "task-research", "task-planning", "task-analysis", "task-automation", "task-writing", "task-review", "task-learning"]
+color = "#2563EB"

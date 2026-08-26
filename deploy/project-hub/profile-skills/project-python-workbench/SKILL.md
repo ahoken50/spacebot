@@ -1,9 +1,9 @@
 ---
 name: project-python-workbench
-description: Créer et exécuter des scripts Python locaux, ou rechercher une compétence manquante de façon contrôlée. Utiliser pour automatiser un calcul, une extraction, un contrôle ou un traitement Project Hub sans capacité existante.
+description: Créer et exécuter des scripts Python locaux, ou rechercher une compétence manquante de façon contrôlée. Utiliser pour automatiser un calcul, une extraction, un contrôle ou un traitement Autonomous Task Hub sans capacité existante.
 ---
 
-# Atelier Python et découverte de compétences Project Hub
+# Atelier Python et découverte de compétences Autonomous Task Hub
 
 ## Évaluer le besoin
 
@@ -13,9 +13,9 @@ description: Créer et exécuter des scripts Python locaux, ou rechercher une co
 
 ## Créer un script local
 
-1. Écrire le script dans `00_systeme/scripts/<agent_id>/<nom-kebab>.py`. Créer aussi un bref `README.md` adjacent qui décrit les entrées, sorties, version Python, dépendances et essai effectué.
-2. Limiter les entrées et sorties au workspace Project Hub. Ne jamais lire ou écrire hors de `/data/shared-workspace`, ne jamais intégrer de secret, ni envoyer une pièce municipale à un service externe.
-3. Privilégier la bibliothèque standard. Ne pas installer de paquet, lancer `pip`, créer un environnement virtuel ou télécharger du code sans proposition et approbation explicite.
+1. Écrire le script dans `05_automatisation/01_scripts/<agent_id>/<nom-kebab>.py`. Créer aussi un bref `README.md` adjacent qui décrit les entrées, sorties, version Python, dépendances et essai effectué.
+2. Limiter les entrées et sorties au workspace Autonomous Task Hub. Ne jamais lire ou écrire hors de `/data/shared-workspace`, ne jamais intégrer de secret, ni transmettre une pièce de travail à un service externe sans décision explicite.
+3. Privilégier la bibliothèque standard. Si un paquet est nécessaire, préparer une proposition typée pour le contrôleur d’environnement avec paquet et version exacte; ne pas lancer `pip`, créer un environnement virtuel ou télécharger du code par commande libre.
 4. Fournir des arguments explicites, valider les chemins et formats, produire des messages d’erreur utiles, écrire les sorties de façon atomique et conserver une trace d’exécution courte.
 5. Tester au minimum avec `python3 -m py_compile <script>` et un essai non destructif sur un échantillon admissible. Ne jamais écraser une source officielle ou un livrable approuvé.
 6. Enregistrer dans la mémoire commune le rôle du script, les sources, le chemin, l’essai et les limites lorsqu’il influence un livrable ou une décision.
@@ -29,4 +29,4 @@ description: Créer et exécuter des scripts Python locaux, ou rechercher une co
 
 ## Interdictions
 
-Ne jamais installer ou modifier automatiquement un MCP, un modèle, Docker, une permission, un secret, une configuration ou une dépendance Python. Ne jamais publier un script, une source municipale ou une donnée personnelle dans un dépôt externe. Ne jamais réutiliser une compétence externe sans vérifier qu’elle correspond réellement au mandat Project Hub.
+Les dépendances, Docker et MCP locaux peuvent évoluer via le contrôleur typé, avec provenance, validation, audit et retour arrière; ne jamais les modifier par commande libre. Ne jamais modifier un modèle, une permission, un secret, une politique d’accès ou une donnée source. Ne jamais publier un script, une source de travail ou une donnée personnelle dans un dépôt externe.

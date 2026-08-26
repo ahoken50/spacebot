@@ -64,7 +64,7 @@ function createServer() {
       {
         description: 'Lancer une amélioration SkillOpt strictement bornée d’une seule compétence autorisée à partir d’un jeu approuvé. Produit seulement une proposition pending_approval avec un diff et des scores; ne modifie jamais la production.',
         inputSchema: {
-          confirm_approved_reference_pack: z.literal(true).describe('Confirmer que le jeu est approuvé, dépersonnalisé, séparé en partitions et ne contient aucune pièce municipale confidentielle.'),
+          confirm_approved_reference_pack: z.literal(true).describe('Confirmer que le jeu est approuvé, dépersonnalisé, séparé en partitions et ne contient aucune pièce confidentielle.'),
         },
       },
       async () => textResult(await runSkillOpt(['learn'])),

@@ -34,7 +34,7 @@ await writeFile(path.join(proposalDir, 'proposal.json'), `${JSON.stringify({
   promotion: 'blocked_pending_user_approval',
   created_at: '2026-08-25T00:00:00.000Z',
   source_task_number: 42,
-  target_agent_id: 'project-finance',
+  target_agent_id: 'task-analysis',
   failure_category: 'missing_tool',
   candidate_path: candidatePath,
   constraints: {
@@ -123,7 +123,7 @@ try {
   bridgeTask = {
     ...bridgeTask,
     status: 'ready',
-    approved_by: 'administration-vdo',
+    approved_by: 'workspace-owner',
     approved_at: '2026-08-25T12:00:00.000Z',
   };
   const promoted = await fetch(`http://127.0.0.1:${servicePort}/internal/scan`, {
@@ -133,8 +133,8 @@ try {
   assert.equal((await promoted.json()).promoted[0].proposal_id, proposalId);
   assert.equal(bridgeTask.status, 'done');
 
-  const installed = await readFile(path.join(instanceRoot, 'agents', 'project-finance', 'workspace', 'skills', 'project-failure-lessons', 'SKILL.md'), 'utf8');
-  const persisted = await readFile(path.join(instanceRoot, 'approved-skill-overlays', 'project-finance', 'project-failure-lessons', 'SKILL.md'), 'utf8');
+  const installed = await readFile(path.join(instanceRoot, 'agents', 'task-analysis', 'workspace', 'skills', 'project-failure-lessons', 'SKILL.md'), 'utf8');
+  const persisted = await readFile(path.join(instanceRoot, 'approved-skill-overlays', 'task-analysis', 'project-failure-lessons', 'SKILL.md'), 'utf8');
   assert.ok(installed.includes('Vérifier l’outil disponible avant toute reprise.'));
   assert.equal(installed, persisted);
   const proposal = JSON.parse(await readFile(path.join(proposalDir, 'proposal.json'), 'utf8'));

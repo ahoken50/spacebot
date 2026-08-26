@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run validation-gated SkillOpt learning cycles for approved Project Hub skills."""
+"""Run validation-gated SkillOpt learning cycles for approved Autonomous Task Hub skills."""
 from __future__ import annotations
 
 import argparse
@@ -47,6 +47,11 @@ ALLOWED_SKILLS = {
     "project-reporting",
     "project-governance",
     "project-document-studio",
+    "task-adaptive-orchestration",
+    "task-autonomous-execution",
+    "task-self-evaluation",
+    "task-safe-self-improvement",
+    "task-source-research",
 }
 
 
@@ -91,7 +96,7 @@ def validate_cases(cases: Any, label: str, maximum: int) -> list[dict[str, Any]]
         if len(str(raw["task_input"])) > 4000:
             raise ValueError(f"Le cas {raw['id']} dépasse 4 000 caractères; conserver un exemple concis et dépersonnalisé.")
         if int(expected.get("max_chars", 5000)) > 6000:
-            raise ValueError(f"Le cas {raw['id']} autorise une sortie trop longue; limite Project Hub : 6 000 caractères.")
+            raise ValueError(f"Le cas {raw['id']} autorise une sortie trop longue; limite Autonomous Task Hub : 6 000 caractères.")
         normalized.append(raw)
     if len(case_ids(normalized)) != len(normalized):
         raise ValueError(f"Les identifiants de cas de la partition {label} doivent être uniques.")
@@ -370,8 +375,8 @@ def run_learning(trigger: str) -> dict[str, Any]:
         "review_required": [
             "Vérifier le diff entre baseline_SKILL.md et candidate_SKILL.md.",
             "Vérifier les métriques sur la partition holdout indépendante.",
-            "Confirmer l’absence de données municipales sensibles dans le pack.",
-            "Promouvoir uniquement via un commit distinct et les contrôles statiques Project Hub.",
+            "Confirmer l’absence de données sensibles dans le pack.",
+            "Promouvoir uniquement via un commit distinct et les contrôles statiques Autonomous Task Hub.",
         ],
     }
     write_json(proposal_dir / "proposal.json", proposal)

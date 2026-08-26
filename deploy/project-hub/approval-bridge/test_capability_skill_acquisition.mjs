@@ -11,7 +11,7 @@ const workspace = path.join(instanceRoot, 'shared-workspace');
 const apiPort = 39191;
 const servicePort = 39192;
 const token = 'test-capability-skill-token';
-const proposalId = 'capability-skill-finances-test';
+const proposalId = 'capability-skill-automation-test';
 const proposalPath = path.join(workspace, '00_systeme', 'propositions_capacites', `${proposalId}.json`);
 
 await mkdir(path.dirname(proposalPath), { recursive: true });
@@ -20,9 +20,9 @@ await writeFile(proposalPath, `${JSON.stringify({
   kind: 'capability_skill_acquisition',
   status: 'pending_approval',
   created_at: '2026-08-25T00:00:00.000Z',
-  target_agent_id: 'project-finance',
-  skill_source: 'example-org/finance-skill',
-  review_summary: 'Compétence lue et proposée uniquement pour le workspace finances.',
+  target_agent_id: 'task-automation',
+  skill_source: 'example-org/automation-skill',
+  review_summary: 'Compétence lue et proposée uniquement pour le workspace d’automatisation.',
   constraints: {
     workspace_skill_only: true,
     mcp_change: false,
@@ -107,7 +107,7 @@ try {
   assert.equal((await created.json()).created[0].proposal_id, proposalId);
   assert.equal(tasks[0].status, 'pending_approval');
 
-  tasks[0] = { ...tasks[0], status: 'ready', approved_by: 'administration-vdo', approved_at: '2026-08-25T12:00:00.000Z' };
+  tasks[0] = { ...tasks[0], status: 'ready', approved_by: 'workspace-owner', approved_at: '2026-08-25T12:00:00.000Z' };
   const approved = await fetch(`http://127.0.0.1:${servicePort}/internal/scan`, {
     method: 'POST', headers: { authorization: `Bearer ${token}` },
   });
@@ -121,10 +121,10 @@ try {
   const authorization = JSON.parse(await readFile(authorizationPath, 'utf8'));
   assert.equal(authorization.kind, 'capability_skill_install_authorization');
   assert.equal(authorization.status, 'approved_for_agent_install');
-  assert.equal(authorization.target_agent_id, 'project-finance');
-  assert.equal(authorization.skill_source, 'example-org/finance-skill');
+  assert.equal(authorization.target_agent_id, 'task-automation');
+  assert.equal(authorization.skill_source, 'example-org/automation-skill');
   assert.equal(authorization.workspace_skill_only, true);
-  await assert.rejects(readFile(path.join(instanceRoot, 'agents', 'project-finance', 'workspace', 'skills', 'finance-skill', 'SKILL.md')));
+  await assert.rejects(readFile(path.join(instanceRoot, 'agents', 'task-automation', 'workspace', 'skills', 'automation-skill', 'SKILL.md')));
   console.log('Test d’intégration approval-bridge / capacité skill : OK');
 } finally {
   child.kill('SIGTERM');

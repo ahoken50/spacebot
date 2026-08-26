@@ -164,7 +164,7 @@ function candidateFor(record, target) {
   };
   if (target === 'dspy') {
     const baselineInstruction = redactText(payload.baseline_instruction);
-    const agentId = redactText(payload.agent_id ?? 'project-coordination');
+    const agentId = redactText(payload.agent_id ?? 'task-orchestrator');
     if (!baselineInstruction || !agentId) return null;
     return { ...base, agent_id: agentId, baseline_instruction: baselineInstruction };
   }

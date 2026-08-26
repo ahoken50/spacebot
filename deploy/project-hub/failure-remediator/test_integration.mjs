@@ -16,8 +16,8 @@ const task = {
   title: 'Préparer le rapprochement financier',
   description: 'Utiliser le dossier de travail local.',
   status: 'failed',
-  owner_agent_id: 'project-finance',
-  assigned_agent_id: 'project-finance',
+  owner_agent_id: 'task-analysis',
+  assigned_agent_id: 'task-analysis',
   revision: 1,
 };
 const attempt = {

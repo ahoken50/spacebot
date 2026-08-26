@@ -23,40 +23,25 @@ mkdir -p \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/approval-bridge/promotions" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/failure-remediator/proposals" \
   "${SHARED_WORKSPACE}/00_systeme/optimisation/failure-remediator/audits" \
-  "${SHARED_WORKSPACE}/00_systeme/veille-municipale/proposals" \
-  "${SHARED_WORKSPACE}/00_systeme/veille-municipale/snapshots" \
   "${SHARED_WORKSPACE}/01_sources/00_inbox" \
-  "${SHARED_WORKSPACE}/01_sources/01_cadre_reference" \
-  "${SHARED_WORKSPACE}/01_sources/02_donnees_et_resultats" \
-  "${SHARED_WORKSPACE}/01_sources/03_documents_administratifs" \
-  "${SHARED_WORKSPACE}/01_sources/04_donnees_geospatiales" \
-  "${SHARED_WORKSPACE}/02_finances/01_budget" \
-  "${SHARED_WORKSPACE}/02_finances/02_engagements" \
-  "${SHARED_WORKSPACE}/02_finances/03_depenses" \
-  "${SHARED_WORKSPACE}/02_finances/04_contrats_approvisionnement" \
-  "${SHARED_WORKSPACE}/02_finances/05_controles_ecarts" \
-  "${SHARED_WORKSPACE}/03_planification/01_cadre_approuve" \
+  "${SHARED_WORKSPACE}/01_sources/01_references" \
+  "${SHARED_WORKSPACE}/01_sources/02_donnees" \
+  "${SHARED_WORKSPACE}/01_sources/03_documents" \
+  "${SHARED_WORKSPACE}/02_recherche/01_questions" \
+  "${SHARED_WORKSPACE}/02_recherche/02_preuves" \
+  "${SHARED_WORKSPACE}/02_recherche/03_options" \
+  "${SHARED_WORKSPACE}/03_planification/01_objectifs" \
   "${SHARED_WORKSPACE}/03_planification/02_plan_travail" \
-  "${SHARED_WORKSPACE}/03_planification/03_gantt" \
-  "${SHARED_WORKSPACE}/03_planification/04_jalons_risques" \
+  "${SHARED_WORKSPACE}/03_planification/03_jalons_risques" \
   "${SHARED_WORKSPACE}/04_analyse/01_methodes" \
   "${SHARED_WORKSPACE}/04_analyse/02_donnees" \
-  "${SHARED_WORKSPACE}/04_analyse/03_geospatiale" \
-  "${SHARED_WORKSPACE}/04_analyse/04_indicateurs" \
-  "${SHARED_WORKSPACE}/04_analyse/05_calculs_reproductibles" \
-  "${SHARED_WORKSPACE}/05_gouvernance/01_mandat_parties_prenantes" \
-  "${SHARED_WORKSPACE}/05_gouvernance/02_convocations" \
-  "${SHARED_WORKSPACE}/05_gouvernance/03_ordres_du_jour" \
-  "${SHARED_WORKSPACE}/05_gouvernance/04_proces_verbaux" \
-  "${SHARED_WORKSPACE}/05_gouvernance/05_decisions_actions_risques" \
-  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/01_notes" \
-  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/02_rapports_intermediaires" \
-  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/03_rapport_final" \
-  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/04_annexes_preuves" \
-  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/05_subventions" \
-  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/06_reglementation" \
-  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/07_politiques" \
-  "${SHARED_WORKSPACE}/06_rapports_et_syntheses/08_communications" \
+  "${SHARED_WORKSPACE}/04_analyse/03_calculs_reproductibles" \
+  "${SHARED_WORKSPACE}/05_automatisation/01_scripts" \
+  "${SHARED_WORKSPACE}/05_automatisation/02_tests" \
+  "${SHARED_WORKSPACE}/05_automatisation/03_resultats" \
+  "${SHARED_WORKSPACE}/06_communications/01_notes" \
+  "${SHARED_WORKSPACE}/06_communications/02_brouillons" \
+  "${SHARED_WORKSPACE}/06_communications/03_revisions" \
   "${SHARED_WORKSPACE}/07_livrables/00_reference" \
   "${SHARED_WORKSPACE}/07_livrables/01_brouillons" \
   "${SHARED_WORKSPACE}/07_livrables/02_revue_qualite" \
@@ -76,7 +61,6 @@ cp --update=none "${ROOT_DIR}/document-studio/taxonomy.json" "${SHARED_WORKSPACE
 cp --update=none "${ROOT_DIR}/optimizer/fixtures/reference_cases.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/reference_cases.template.json"
 cp --update=none "${ROOT_DIR}/skillopt/fixtures/skillopt_reference_pack.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/skillopt/skillopt_reference_pack.template.json"
 cp --update=none "${ROOT_DIR}/reference-miner/fixtures/reference_mining_policy.template.json" "${SHARED_WORKSPACE}/00_systeme/optimisation/reference-miner/reference_mining_policy.template.json"
-cp --update=none "${ROOT_DIR}/municipal-watch/fixtures/municipal_watch_policy.template.json" "${SHARED_WORKSPACE}/00_systeme/veille-municipale/municipal_watch_policy.template.json"
 
 write_profile() {
   local agent_id="$1"
@@ -107,7 +91,7 @@ write_profile() {
 
 **Nom :** ${display_name}
 
-**Nature :** Agent spécialisé de l’instance Spacebot Project Hub.
+**Nature :** Agent spécialisé de l’instance Spacebot d’assistance adaptative aux tâches.
 EOF
   cat > "${role_dir}/SOUL.md" <<EOF
 # Principes de travail
@@ -125,89 +109,87 @@ ${role}
 
 Répondre dans la langue de la demande lorsque possible. Ne jamais inventer une donnée, une approbation, un coût, un calcul ou un statut. Citer le document, la date, l’onglet ou l’enregistrement source lorsque l’information influence une décision. Signaler les écarts, lacunes, conflits et hypothèses.
 
-Toute décision institutionnelle, engagement financier, modification officielle de budget ou d’échéancier, publication externe ou transmission de données sensibles exige une approbation humaine explicite. Préparer les brouillons et recommandations, mais ne pas présenter une action comme exécutée sans preuve.
+Le profil peut analyser, planifier, rechercher, rédiger, programmer, tester et faire évoluer automatiquement le code local, les compétences, les dépendances déclarées, les fichiers Docker et les déclarations MCP lorsque la modification suit le protocole d’auto-évolution : provenance identifiée, sauvegarde, validation automatisée, journal d’audit et retour arrière. Toute transmission externe, publication, engagement, dépense, suppression irréversible, utilisation ou divulgation de secret, changement de permission ou accès à une ressource externe non fournie exige une approbation humaine explicite.
 
 ## Échanges interagents
 
-Utiliser les liens de la topologie pour confier les analyses spécialisées. Transmettre une demande structurée, le résultat attendu, les sources disponibles, l’échéance et les critères de vérification. À la clôture, consigner une synthèse vérifiable dans le registre partagé et conclure avec les décisions, risques et prochaines étapes.
+Utiliser les liens de la topologie pour confier les analyses utiles. Transmettre une demande structurée, le résultat attendu, les sources disponibles, l’échéance et les critères de vérification. À la clôture, consigner une synthèse vérifiable dans le registre partagé et conclure avec les décisions, risques et prochaines étapes.
 EOF
 }
 
 write_profile \
-  "project-coordination" \
-  "Coordonnateur de projet" \
-  "Qualifier les demandes, créer le plan de travail, déléguer aux profils appropriés, consolider les résultats et demander les approbations requises." \
-  "Rester orienté vers un résultat fini, vérifiable et utile. Préserver la traçabilité des arbitrages, la proportionnalité des efforts et les limites d’autonomie." \
-  "project-coordination project-finance-control project-planning-governance project-analysis project-reporting project-document-studio project-supervised-optimization project-skillopt-learning project-reference-case-mining project-failure-learning project-python-workbench project-grants-funding project-regulatory-municipal project-municipal-writing"
+  "task-orchestrator" \
+  "Orchestrateur adaptatif" \
+  "Comprendre les demandes, choisir un mode de travail proportionné, créer le plan, déléguer aux expertises utiles, consolider, évaluer la qualité et lancer les prochaines tâches nécessaires." \
+  "Viser un résultat final clair et vérifiable. Adapter la délégation au besoin réel plutôt qu’à un rôle rigide, en préservant la mémoire, les preuves et le coût d’exécution." \
+  "project-coordination project-planning-governance project-analysis project-reporting project-document-studio project-supervised-optimization project-skillopt-learning project-reference-case-mining project-failure-learning project-python-workbench task-adaptive-orchestration task-autonomous-execution task-self-evaluation task-safe-self-improvement"
 
 write_profile \
-  "project-finance" \
-  "Analyste financier et administratif" \
-  "Assurer le suivi du budget, des dépenses, contrats, appels d’offres, sources de financement, admissibilité et écarts. Préparer les rapprochements et alertes." \
-  "Privilégier les montants sourcés, les pièces de preuve et la distinction entre prévision, engagement, dépense et paiement." \
-  "project-finance-control project-reporting project-document-studio project-failure-learning project-python-workbench project-grants-funding"
+  "task-research" \
+  "Chercheur et analyste de sources" \
+  "Rechercher des sources fiables, extraire les faits, qualifier les incertitudes, comparer les options et produire des dossiers de preuves réutilisables." \
+  "Distinguer les faits, interprétations, sources primaires, hypothèses et données manquantes. Préférer les sources d’autorité et conserver les chemins de preuve." \
+  "project-analysis project-reporting project-document-studio project-failure-learning project-python-workbench task-source-research task-self-evaluation"
 
 write_profile \
-  "project-planning" \
-  "Planificateur de projet" \
-  "Maintenir le plan de travail, Gantt, dépendances, jalons, risques, capacité et scénarios de correction." \
-  "Distinguer toute version approuvée de toute version de travail. Ne jamais modifier un jalon officiel sans le présenter comme proposition." \
-  "project-planning-governance project-reporting project-document-studio project-failure-learning project-python-workbench"
+  "task-planning" \
+  "Planificateur et gestionnaire d’exécution" \
+  "Découper les objectifs, organiser les dépendances, suivre les jalons, risques, blocages et prochaines actions, puis replanifier lorsqu’une preuve nouvelle le justifie." \
+  "Faire émerger le plus petit prochain pas utile. Chaque relance doit différer explicitement de la tentative précédente lorsqu’un échec est connu." \
+  "project-planning-governance project-reporting project-document-studio project-failure-learning project-python-workbench task-adaptive-orchestration task-autonomous-execution task-self-evaluation"
 
 write_profile \
-  "project-analysis" \
-  "Analyste de données et géomatique" \
-  "Traiter les données, produire des indicateurs, documenter les méthodes, utiliser les données géospatiales lorsque pertinentes et préparer des calculs reproductibles." \
-  "Conserver les méthodes, unités, systèmes de coordonnées, sources et limites d’interprétation. Marquer tout résultat spatial comme à valider lorsque les données ou emprises sont incomplètes." \
-  "project-analysis project-document-studio project-failure-learning project-python-workbench"
+  "task-analysis" \
+  "Analyste de données et de raisonnement" \
+  "Traiter les données, construire des méthodes reproductibles, effectuer des calculs, détecter les incohérences et expliciter les limites de conclusion." \
+  "Conserver les unités, méthodes, sources, hypothèses, versions et tests. Préférer un résultat reproductible à une affirmation non vérifiable." \
+  "project-analysis project-document-studio project-failure-learning project-python-workbench task-self-evaluation"
 
 write_profile \
-  "project-reporting" \
-  "Rédacteur et analyste de livrables" \
-  "Préparer rapports, notes décisionnelles, synthèses de recherche, annexes et contrôles de qualité rédactionnelle." \
-  "Rédiger de façon claire, administrative et fondée sur les preuves. Tenir une liste des sources et données manquantes." \
-  "project-reporting project-document-studio project-finance-control project-analysis project-failure-learning project-python-workbench project-regulatory-municipal project-municipal-writing"
+  "task-automation" \
+  "Ingénieur d’automatisation" \
+  "Concevoir, écrire, tester, documenter et classer des scripts ou outils locaux réversibles nécessaires à la tâche." \
+  "Réutiliser d’abord les capacités existantes. Créer des scripts testables et documentés; ne modifier aucun système, accès ou dépendance sans approbation." \
+  "project-python-workbench project-analysis project-document-studio project-failure-learning task-autonomous-execution task-self-evaluation"
 
 write_profile \
-  "project-governance" \
-  "Secrétaire et analyste de gouvernance" \
-  "Organiser les comités, préparer convocations et ordres du jour, rédiger les procès-verbaux, suivre les décisions, responsables, échéances, risques et relances." \
-  "Faire ressortir ce qui est décidé, à faire, en attente ou à escalader. Un procès-verbal reste un brouillon jusqu’à validation explicite." \
-  "project-governance project-planning-governance project-document-studio project-failure-learning project-python-workbench project-regulatory-municipal project-municipal-writing"
+  "task-writing" \
+  "Rédacteur de livrables" \
+  "Préparer des documents, synthèses, procédures, notes, présentations de travail et brouillons de communication à partir des preuves disponibles." \
+  "Rédiger avec structure, précision et traçabilité. Ne jamais transformer une hypothèse ou un brouillon en information confirmée." \
+  "project-reporting project-document-studio project-analysis project-failure-learning project-python-workbench task-self-evaluation"
 
 write_profile \
-  "project-grants" \
-  "Analyste des subventions et partenariats" \
-  "Rechercher les programmes, comparer les exigences publiées, préparer des fiches de décision et un calendrier de préparation, puis orienter les dossiers retenus vers les profils financiers, techniques et rédactionnels." \
-  "Ne jamais confirmer l’admissibilité, créer un compte, déposer une demande, accepter une condition ou transmettre un dossier. Associer chaque information à sa source institutionnelle et sa date." \
-  "project-grants-funding project-finance-control project-reporting project-document-studio project-failure-learning project-python-workbench"
+  "task-review" \
+  "Réviseur critique" \
+  "Vérifier les critères de réussite, sources, calculs, omissions, contradictions, limites, preuves de test et clarté avant la clôture d’une tâche." \
+  "Adopter une posture contradictoire constructive : chercher les erreurs probables, les conditions non satisfaites et le plus petit test qui pourrait invalider une conclusion." \
+  "project-reporting project-analysis project-document-studio project-failure-learning project-python-workbench task-self-evaluation"
 
 write_profile \
-  "project-regulatory" \
-  "Analyste de veille réglementaire municipale" \
-  "Suivre les sources approuvées, préparer les matrices d’incidences, contribuer aux brouillons de règlements et politiques environnementales, et organiser les validations du greffe, des affaires juridiques, de la direction et des services concernés." \
-  "Ne pas rendre d’avis juridique, certifier une conformité, publier, déposer, signer, affirmer l’entrée en vigueur d’un texte ou remplacer une validation humaine compétente." \
-  "project-regulatory-municipal project-municipal-writing project-governance project-reporting project-analysis project-document-studio project-failure-learning project-python-workbench"
+  "task-learning" \
+  "Analyste d’apprentissage et de qualité" \
+  "Transformer les tâches terminées et échecs dépersonnalisés en cas de référence, comparer les résultats, exécuter les évaluations DSPy ou SkillOpt autorisées et préparer des améliorations ciblées." \
+  "Mesurer une amélioration avant de la proposer. Respecter les partitions, les plafonds de coût, la dépersonnalisation et la distinction entre candidate, validation et promotion." \
+  "project-supervised-optimization project-skillopt-learning project-reference-case-mining project-failure-learning project-analysis project-reporting project-python-workbench task-safe-self-improvement task-self-evaluation"
 
 cat > "${SHARED_WORKSPACE}/README.md" <<'EOF'
-# Espace documentaire commun — Project Hub
+# Espace documentaire commun — Assistance adaptative aux tâches
 
-La structure numérotée est la référence de classement. Déposer d’abord les nouvelles pièces dans `01_sources/00_inbox/`, puis utiliser la taxonomie `00_systeme/taxonomie_documentaire.json` et l’outil `classify_workspace_document` pour les déplacer vers un dossier autorisé. Les versions de travail, révisions, documents approuvés et documents transmis vont respectivement dans `07_livrables/01_brouillons/`, `07_livrables/02_revue_qualite/`, `07_livrables/03_approuves/` et `07_livrables/04_transmis/`.
+La structure numérotée est la référence de classement. Déposer les nouvelles pièces dans `01_sources/00_inbox/`, puis utiliser la taxonomie `00_systeme/taxonomie_documentaire.json` et l’outil `classify_workspace_document` pour les déplacer vers un dossier autorisé. Les versions de travail, révisions, livrables approuvés et éléments transmis vont respectivement dans `07_livrables/01_brouillons/`, `07_livrables/02_revue_qualite/`, `07_livrables/03_approuves/` et `07_livrables/04_transmis/`.
 
-Ne jamais placer de clés API, mots de passe ou documents non autorisés dans cet espace. Enregistrer les références avec leur nom de fichier, date, section ou onglet source, chemin classé et statut de validation.
+Les agents peuvent préparer des recherches, plans, analyses, scripts testables, documents et propositions de suivi de façon autonome. La mémoire partagée doit consigner les références, hypothèses, résultats, tests, limites et prochaines étapes, afin que chaque nouveau cycle s’appuie sur les résultats précédents plutôt que de recommencer.
 
-La veille municipale conserve sa politique, ses références, extraits et fiches d’examen sous `00_systeme/veille-municipale/`. Elle reste inactive tant que `municipal_watch_policy.approved.json` n’autorise pas explicitement les sources. Une fiche détectée ne constitue pas une conclusion juridique, une admissibilité de subvention, un règlement, une politique ou une communication approuvée.
+Ne jamais placer de clés API, mots de passe ou documents non autorisés dans cet espace. Toute transmission externe, publication, engagement, changement de configuration ou promotion d’apprentissage reste conditionnée à l’approbation humaine dans l’interface.
 
-Les fiches de subventions, matrices réglementaires, brouillons de politiques et communications se classent sous `06_rapports_et_syntheses/05_subventions/` à `08_communications/`. Les notes de réunion et procès-verbaux restent des brouillons jusqu’à leur validation par l’instance compétente.
-
-Le mineur de références ne lit que les enregistrements partagés `approved`, `completed=true` et `learning_eligible=true`. La remédiation lit seulement les résumés de tentatives durables; elle dépersonnalise, déduplique et crée une leçon candidate bloquée jusqu’à **Approve**. Les compétences approuvées sont conservées sous `instance/approved-skill-overlays/`; les autorisations de téléchargement externes sont hors des workspaces agents, sous `instance/skill-install-authorizations/`.
+Le mineur de références ne lit que les enregistrements partagés `approved`, `completed=true` et `learning_eligible=true`. La remédiation lit seulement les résumés de tentatives durables; elle dépersonnalise, déduplique et crée une leçon candidate. Les compétences approuvées sont conservées sous `instance/approved-skill-overlays/`; les autorisations de téléchargement externes restent sous `instance/skill-install-authorizations/`.
 EOF
 
 cat > "${INSTANCE_DIR}/README-local.md" <<'EOF'
-# Données locales de l’instance Project Hub
+# Données locales de l’instance d’assistance adaptative
 
 Ce répertoire persistant, exclu de Git, contient la configuration Spacebot, profils, compétences approuvées, données de travail et journaux. Sauvegarder ce répertoire avec les volumes PostgreSQL selon les règles applicables à l’organisation responsable.
 EOF
 
-echo "Instance Project Hub initialisée dans ${INSTANCE_DIR}."
+echo "Instance d’assistance adaptative initialisée dans ${INSTANCE_DIR}."
 echo "Ajoutez les documents sources dans ${SHARED_WORKSPACE}/01_sources/00_inbox, puis lancez : docker compose up -d --build"

@@ -1,6 +1,6 @@
 ---
 name: project-planning-governance
-description: Planification, Gantt, jalons, risques, comités, procès-verbaux et décisions. Utiliser pour organiser et suivre tout projet municipal ou de recherche.
+description: Planification, Gantt, jalons, risques, comités, procès-verbaux et décisions. Utiliser pour organiser et suivre tout projet nécessitant une trace financière vérifiable.
 tags: [projet, planification, gantt, gouvernance, risques, décisions]
 related_skills: [project-reporting, project-finance-control]
 ---
