@@ -194,6 +194,7 @@ coordination_skill = (ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md
 assert 'sans déléguer' in coordination_skill and 'ne pas appeler l’outil de délégation' in coordination_skill, 'Le coordonnateur doit respecter une consigne explicite de non-délégation.'
 assert '/data/shared-workspace/01_sources/00_inbox' in coordination_skill, 'Le coordonnateur doit lire l’inbox depuis l’espace partagé, jamais son workspace privé.'
 assert 'oasis_shared_memory_search_shared_memory' in coordination_skill, 'Le flux direct doit interroger la mémoire avec le nom MCP préfixé.'
+assert 'ne jamais appeler `wait`, `echo`, `sleep`, `poll`' in coordination_skill, 'Le coordonnateur doit interdire les pseudo-outils de suivi.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
 assert bootstrap.count('oasis-python-workbench') == 6, 'La compétence Python doit être préchargée pour les six profils.'
 assert 'workspace/skills' in bootstrap and 'approved-skill-overlays' in bootstrap, 'Les compétences de profil et recouvrements approuvés doivent être préparés dans les workspaces privés.'
