@@ -3508,8 +3508,10 @@ async fn initialize_agents(
                 agent.deps.sandbox.clone(),
                 agent.deps.runtime_config.clone(),
                 api_state.clone(),
+                agent.deps.mcp_manager.clone(),
                 Some(cortex_ctx.clone()),
-            );
+            )
+            .await;
             // Add factory tools to the cortex chat tool server
             let factory_enabled = match spacebot::tools::add_factory_tools(
                 &tool_server,

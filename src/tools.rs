@@ -1355,7 +1355,7 @@ pub fn create_worker_tool_server(
 #[deprecated(
     note = "Cortex chat is being replaced by Channel Settings. Port remaining tools before removing."
 )]
-pub fn create_cortex_chat_tool_server(
+pub async fn create_cortex_chat_tool_server(
     agent_id: AgentId,
     deps: crate::AgentDeps,
     task_store: Arc<TaskStore>,
@@ -1371,10 +1371,12 @@ pub fn create_cortex_chat_tool_server(
     sandbox: Arc<Sandbox>,
     runtime_config: Arc<RuntimeConfig>,
     api_state: Arc<crate::api::ApiState>,
+    mcp_manager: Arc<crate::mcp::McpManager>,
     cortex_ctx: Option<crate::tools::spawn_worker::CortexChatContext>,
 ) -> ToolServerHandle {
     let logs_dir = workspace.join(".spacebot").join("logs");
     let lifecycle = api_state.lifecycle.load().as_ref().clone();
+    let mcp_tools = mcp_manager.get_tools().await;
     let goal_store = deps.goal_store.clone();
 
     let spawn_tool = {
@@ -1444,6 +1446,10 @@ pub fn create_cortex_chat_tool_server(
 
     if let Some(key) = brave_search_key {
         server = server.tool(WebSearchTool::new(key));
+    }
+
+    for mcp_tool in mcp_tools {
+        server = server.tool(mcp_tool);
     }
 
     if let Some(lifecycle) = lifecycle {

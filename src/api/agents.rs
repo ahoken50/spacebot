@@ -1115,8 +1115,10 @@ pub async fn create_agent_internal(
         sandbox.clone(),
         runtime_config.clone(),
         state.clone(),
+        deps.mcp_manager.clone(),
         Some(cortex_ctx.clone()),
-    );
+    )
+    .await;
     // Add factory tools to the cortex chat tool server
     if let Err(error) =
         crate::tools::add_factory_tools(&cortex_tool_server, state.clone(), memory_search.clone())
