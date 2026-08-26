@@ -156,8 +156,22 @@ python_skill = ROOT / 'profile-skills' / 'oasis-python-workbench' / 'SKILL.md'
 python_scaffold = ROOT / 'profile-skills' / 'oasis-python-workbench' / 'scripts' / 'scaffold_oasis_python_script.py'
 assert python_skill.is_file() and python_scaffold.is_file(), 'La compétence Python et son générateur sont requis.'
 assert 'python3 -m py_compile' in python_skill.read_text(encoding='utf-8'), 'La compétence Python doit exiger une compilation de contrôle.'
-skill_texts = '\n'.join(path.read_text(encoding='utf-8') for path in (ROOT / 'skills').rglob('SKILL.md'))
-skill_texts += '\n'.join(path.read_text(encoding='utf-8') for path in (ROOT / 'profile-skills').rglob('SKILL.md'))
+skill_paths = sorted((ROOT / 'skills').rglob('SKILL.md')) + sorted((ROOT / 'profile-skills').rglob('SKILL.md'))
+skill_texts = '\n'.join(path.read_text(encoding='utf-8') for path in skill_paths)
+for skill_path in skill_paths:
+    skill_lines = skill_path.read_text(encoding='utf-8').splitlines()
+    assert skill_lines and skill_lines[0] == '---', f'Frontmatter absent : {skill_path}'
+    try:
+        frontmatter_end = skill_lines.index('---', 1)
+    except ValueError as exc:
+        raise AssertionError(f'Frontmatter non fermé : {skill_path}') from exc
+    frontmatter = skill_lines[1:frontmatter_end]
+    assert any(line.startswith('name: ') for line in frontmatter), f'Nom de compétence absent : {skill_path}'
+    description = next((line for line in frontmatter if line.startswith('description: ')), None)
+    assert description is not None, f'Description de compétence absente : {skill_path}'
+    description_value = description.removeprefix('description: ')
+    if ': ' in description_value:
+        assert description_value.startswith('"') and description_value.endswith('"'), f'Description YAML ambiguë non protégée par guillemets : {skill_path}'
 for raw_tool in (
     'search_shared_memory', 'get_shared_record', 'shared_memory_status',
     'classify_workspace_document', 'create_document_brief', 'render_markdown_document',

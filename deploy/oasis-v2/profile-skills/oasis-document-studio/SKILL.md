@@ -1,6 +1,6 @@
 ---
 name: oasis-document-studio
-description: Production professionnelle de documents OASIS en DOCX et PDF : brief, rédaction structurée, rendu local, aperçu visuel et contrôle qualité. Utiliser pour tout rapport, note, PV, tableau de synthèse ou livrable destiné à une diffusion.
+description: "Production professionnelle de documents OASIS en DOCX et PDF : brief, rédaction structurée, rendu local, aperçu visuel et contrôle qualité. Utiliser pour tout rapport, note, PV, tableau de synthèse ou livrable destiné à une diffusion."
 tags: [oasis, document, docx, pdf, qualité, rendu]
 related_skills: [oasis-reporting, oasis-financial-control, oasis-pse-sig]
 ---

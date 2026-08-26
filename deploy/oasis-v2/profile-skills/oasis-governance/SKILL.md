@@ -1,6 +1,6 @@
 ---
 name: oasis-governance
-description: Comité de suivi OASIS-V2 : convocations, ordre du jour, procès-verbal, décisions, actions, risques, responsables et relances. Utiliser pour toute rencontre ou suivi de gouvernance.
+description: "Comité de suivi OASIS-V2 : convocations, ordre du jour, procès-verbal, décisions, actions, risques, responsables et relances. Utiliser pour toute rencontre ou suivi de gouvernance."
 tags: [oasis, comité, pv, décision, risque]
 related_skills: [oasis-schedule-governance, oasis-document-studio]
 ---

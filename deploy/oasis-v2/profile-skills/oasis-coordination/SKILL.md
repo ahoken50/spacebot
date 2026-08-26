@@ -1,6 +1,6 @@
 ---
 name: oasis-coordination
-description: Coordination OASIS-V2 : clarification, plan de travail, délégation sobre, consolidation, arbitrages et demandes d’approbation. Utiliser pour toute demande transversale ou décision nécessitant plusieurs profils.
+description: "Coordination OASIS-V2 : clarification, plan de travail, délégation sobre, consolidation, arbitrages et demandes d’approbation. Utiliser pour toute demande transversale ou décision nécessitant plusieurs profils."
 tags: [oasis, coordination, délégation, approbation]
 related_skills: [oasis-document-studio, oasis-reporting]
 ---
