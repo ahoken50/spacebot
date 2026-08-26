@@ -13,6 +13,7 @@ use std::sync::Arc;
 pub struct McpToolAdapter {
     server_name: String,
     tool_name: String,
+    exposed_name: Option<String>,
     description: String,
     input_schema: Value,
     connection: Arc<McpConnection>,
@@ -33,18 +34,24 @@ impl McpToolAdapter {
         Self {
             server_name,
             tool_name: tool.name.into_owned(),
+            exposed_name: None,
             description,
             input_schema,
             connection,
         }
     }
 
+    /// Expose a backwards-compatible alias while preserving the MCP server and
+    /// underlying tool invoked by `call`.
+    pub fn with_legacy_alias(mut self) -> Self {
+        self.exposed_name = Some(sanitize_tool_identifier(&self.tool_name));
+        self
+    }
+
     fn namespaced_name(&self) -> String {
-        format!(
-            "{}_{}",
-            sanitize_tool_identifier(&self.server_name),
-            sanitize_tool_identifier(&self.tool_name)
-        )
+        self.exposed_name
+            .clone()
+            .unwrap_or_else(|| namespace_tool_name(&self.server_name, &self.tool_name))
     }
 
     fn collect_result_text(result: &rmcp::model::CallToolResult) -> String {
@@ -139,6 +146,14 @@ impl Tool for McpToolAdapter {
     }
 }
 
+pub(crate) fn namespace_tool_name(server_name: &str, tool_name: &str) -> String {
+    format!(
+        "{}_{}",
+        sanitize_tool_identifier(server_name),
+        sanitize_tool_identifier(tool_name)
+    )
+}
+
 fn sanitize_tool_identifier(raw: &str) -> String {
     let mut value = raw
         .chars()
@@ -179,5 +194,18 @@ impl EmptyStringExt for String {
         } else {
             self
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::namespace_tool_name;
+
+    #[test]
+    fn namespace_tool_name_prefixes_and_sanitizes_mcp_identifiers() {
+        assert_eq!(
+            namespace_tool_name("oasis-shared-memory", "search_shared_memory"),
+            "oasis_shared_memory_search_shared_memory"
+        );
     }
 }

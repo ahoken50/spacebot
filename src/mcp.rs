@@ -546,7 +546,8 @@ impl McpManager {
             .cloned()
             .collect::<Vec<_>>();
 
-        let mut adapters = Vec::new();
+        let mut connected_servers = Vec::new();
+        let mut raw_name_counts = HashMap::new();
         for connection in connections {
             if !connection.is_connected().await {
                 continue;
@@ -554,12 +555,35 @@ impl McpManager {
 
             let server_name = connection.name().to_string();
             let tools = connection.list_tools().await;
+            for tool in &tools {
+                *raw_name_counts
+                    .entry(tool.name.as_ref().to_string())
+                    .or_insert(0_usize) += 1;
+            }
+            connected_servers.push((server_name, connection, tools));
+        }
+
+        let mut adapters = Vec::new();
+        for (server_name, connection, tools) in connected_servers {
             for tool in tools {
+                let raw_name = tool.name.as_ref().to_string();
+                let is_unique_oasis_alias = server_name.starts_with("oasis_")
+                    && raw_name_counts.get(&raw_name) == Some(&1);
                 adapters.push(crate::tools::mcp::McpToolAdapter::new(
                     server_name.clone(),
-                    tool,
+                    tool.clone(),
                     connection.clone(),
                 ));
+                if is_unique_oasis_alias {
+                    adapters.push(
+                        crate::tools::mcp::McpToolAdapter::new(
+                            server_name.clone(),
+                            tool,
+                            connection.clone(),
+                        )
+                        .with_legacy_alias(),
+                    );
+                }
             }
         }
 
@@ -593,9 +617,13 @@ impl McpManager {
                     .as_ref()
                     .map(|d| d.as_ref().to_string())
                     .unwrap_or_default();
+                let exposed_name = crate::tools::mcp::namespace_tool_name(
+                    &server_name,
+                    tool.name.as_ref(),
+                );
                 names.push(format!(
                     "{} — {}",
-                    tool.name,
+                    exposed_name,
                     if description.is_empty() {
                         format!("from {}", server_name)
                     } else {
