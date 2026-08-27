@@ -15,6 +15,7 @@ repository_root = (ROOT / '..' / '..').resolve()
 channel_source = (repository_root / 'src' / 'agent' / 'channel.rs').read_text(encoding='utf-8')
 worker_source = (repository_root / 'src' / 'agent' / 'worker.rs').read_text(encoding='utf-8')
 autonomy_source = (repository_root / 'src' / 'agent' / 'autonomy.rs').read_text(encoding='utf-8')
+channel_dispatch_source = (repository_root / 'src' / 'agent' / 'channel_dispatch.rs').read_text(encoding='utf-8')
 tools_source = (repository_root / 'src' / 'tools.rs').read_text(encoding='utf-8')
 shared_memory_source = (ROOT / 'shared-memory' / 'server.js').read_text(encoding='utf-8')
 shared_memory_reindex_source = (ROOT / 'shared-memory' / 'reindex_embeddings.js').read_text(encoding='utf-8')
@@ -219,6 +220,9 @@ assert 'appeler **immédiatement** `send_agent_message` vers cet agent' in coord
 assert 'tâche Ready auditée et attribuée à l’agent spécialiste' in coordination_skill, 'La délégation interagent doit rester traçable.'
 assert 'maybe_run_autonomy_with_trigger(deps, true).await;' in autonomy_source, 'Un réveil interagent doit déclencher un examen immédiat des tâches Ready.'
 assert 'if !triggered\n        && !autonomy_run_due(' in autonomy_source, 'Seul un déclencheur explicite peut court-circuiter l’intervalle Cortex.'
+assert 'const MAX_BRANCH_WALL_CLOCK_TIMEOUT_SECS: u64 = 300;' in channel_dispatch_source, 'Les branches OASIS doivent avoir une limite de durée stricte.'
+assert 'tokio::time::timeout(' in channel_dispatch_source and 'Branch timed out after {branch_timeout_secs}s without a conclusion.' in channel_dispatch_source, 'Une branche bloquée doit émettre une terminaison et libérer sa capacité.'
+assert 'if branches.len() >= max_branches {' in channel_dispatch_source, 'La limite de branches doit être revérifiée atomiquement avant le lancement.'
 assert 'Immediately deliver that synthesis to the user with the `reply` tool.' in retrigger_prompt, 'La relance doit demander une réponse visible immédiate.'
 assert '`wait`, `echo`, `sleep`, `poll`' in retrigger_prompt, 'La relance doit interdire les pseudo-outils de suivi.'
 assert 'render_retrigger_visible_fallback' in channel_source, 'Le canal doit disposer d’un secours de restitution de worker.'

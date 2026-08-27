@@ -22,6 +22,11 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tracing::Instrument as _;
 
+/// Reasoning branches should conclude quickly. This hard ceiling releases the
+/// per-channel branch reservation even when an upstream model or tool call
+/// stops responding; user-facing task work belongs to agents or workers.
+const MAX_BRANCH_WALL_CLOCK_TIMEOUT_SECS: u64 = 300;
+
 /// Validate worker capacity for a channel based on current active worker count.
 pub(crate) fn reserve_worker_slot_local(
     active_worker_count: usize,
@@ -471,17 +476,27 @@ async fn spawn_branch(
     let channel_id = state.channel_id.clone();
     let secrets_snapshot = state.deps.runtime_config.secrets.load().clone();
 
+    let branch_timeout_secs = (**state.deps.runtime_config.cortex.load())
+        .worker_wall_clock_timeout_secs
+        .clamp(1, MAX_BRANCH_WALL_CLOCK_TIMEOUT_SECS);
     let branch_span = tracing::info_span!(
         "branch.run",
         branch_id = %branch_id,
         channel_id = %state.channel_id,
         description = %description,
+        branch_timeout_secs,
     );
     // Acquire the write lock before spawning so the event loop cannot process
     // BranchResult (which also takes a write lock) before we insert the handle.
-    // Without this, a fast-completing branch sends BranchResult before the
-    // insert, causing `was_active` to be false and suppressing the retrigger.
+    // Recheck capacity while holding this lock: simultaneous channel turns can
+    // otherwise both pass the earlier read-only check and exceed the limit.
     let mut branches = state.active_branches.write().await;
+    if branches.len() >= max_branches {
+        return Err(AgentError::BranchLimitReached {
+            channel_id: state.channel_id.to_string(),
+            max: max_branches,
+        });
+    }
     {
         let mut status = state.status_block.write().await;
         status.add_branch(branch_id, status_label);
@@ -505,13 +520,25 @@ async fn spawn_branch(
 
     let handle = tokio::spawn(
         async move {
-            if let Err(error) = branch.run(&prompt).await {
-                tracing::error!(branch_id = %branch_id, %error, "branch failed");
+            let failure = match tokio::time::timeout(
+                std::time::Duration::from_secs(branch_timeout_secs),
+                branch.run(&prompt),
+            )
+            .await
+            {
+                Ok(Ok(_)) => None,
+                Ok(Err(error)) => Some(("failed", format!("Branch failed: {error}"))),
+                Err(_) => Some((
+                    "timed_out",
+                    format!("Branch timed out after {branch_timeout_secs}s without a conclusion."),
+                )),
+            };
+            if let Some((status, raw)) = failure {
+                tracing::warn!(branch_id = %branch_id, %raw, "branch ended without a normal conclusion");
                 // Scrub the failure message in case the error contains secrets
                 // (e.g. from failed tool calls echoing back prompt content).
                 // Layer 1: exact-match redaction of known secrets from the store.
                 // Layer 2: regex-based redaction of unknown secret patterns.
-                let raw = format!("Branch failed: {error}");
                 let conclusion = if let Some(store) = secrets_snapshot.as_ref() {
                     crate::secrets::scrub::scrub_with_store(&raw, store, &agent_id)
                 } else {
@@ -523,7 +550,7 @@ async fn spawn_branch(
                     branch_id,
                     channel_id,
                     conclusion,
-                    status: "failed".to_string(),
+                    status: status.to_string(),
                     transcript: None,
                     tool_calls: 0,
                 });
