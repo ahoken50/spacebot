@@ -10,8 +10,8 @@ use crate::agent::channel::{Channel, ChannelKind};
 use crate::config::{AutonomyConfig, AutonomyLevel};
 use crate::conversation::settings::{DelegationMode, ResolvedConversationSettings};
 use crate::prompts::engine::{AutonomyRunHistoryView, AutonomyWakeEventView};
-use crate::tasks::{Task, TaskListFilter, TaskStatus};
-use crate::wakes::{AutonomyRunStatus, AutonomyRunStore};
+use crate::tasks::{Task, TaskListFilter, TaskStatus, UpdateTaskInput};
+use crate::wakes::{AutonomyRunStatus, AutonomyRunStore, TASK_APPROVED_WAKE_ID};
 use crate::{AgentDeps, InboundMessage, MessageContent, RoutedResponse};
 
 use std::collections::HashMap;
@@ -302,6 +302,18 @@ pub async fn run_autonomy_channel(
             .await?;
     }
 
+    // A targeted task-approved wake is durable evidence that this agent may
+    // execute exactly that mandate. Claim it before the LLM starts so Portal
+    // immediately reflects real work and a later unclosed run cannot leave it
+    // falsely reported as "not worked yet".
+    let claimed_task_numbers = claim_ready_tasks_woken_by_approval(
+        deps,
+        &run_id,
+        &config,
+        &pending_events,
+    )
+    .await;
+
     let briefing = build_run_briefing(deps, &config, &pending_events).await?;
 
     // Timeout prompts are rendered before the channel spawns so a template
@@ -497,6 +509,14 @@ pub async fn run_autonomy_channel(
                 publish_terminal_summary(deps, &run_id, AUTONOMY_FALLBACK_SUMMARY);
             }
         }
+
+        // The agent was given a targeted, approved mandate but did not finish
+        // its autonomy contract. Once no child is active, report that attempt
+        // durably as failed rather than returning the task to a misleading
+        // Ready/"not worked yet" state. It can be reopened without recreation.
+        if settled {
+            fail_unclosed_claimed_tasks(deps, &run_id, &claimed_task_numbers).await;
+        }
     }
 
     if let Err(error) = deps
@@ -515,8 +535,144 @@ pub async fn run_autonomy_channel(
     Ok(())
 }
 
-/// The run table transition is the idempotency boundary. Only the caller that
-/// changes a run from `running` may add its conclusion to the channel record.
+/// Return unique task numbers from explicit `Task approved` wake payloads,
+/// retaining their arrival order and respecting the configured run capacity.
+fn approved_task_numbers_from_wakes(
+    wake_events: &[crate::wakes::WakeEvent],
+    max_tasks: u32,
+) -> Vec<i64> {
+    let mut task_numbers = Vec::new();
+    for event in wake_events {
+        if event.wake_id != TASK_APPROVED_WAKE_ID {
+            continue;
+        }
+        let Some(task_number) = event.payload.get("task_number").and_then(serde_json::Value::as_i64) else {
+            continue;
+        };
+        if !task_numbers.contains(&task_number) {
+            task_numbers.push(task_number);
+        }
+        if task_numbers.len() >= max_tasks as usize {
+            break;
+        }
+    }
+    task_numbers
+}
+
+/// Move only explicit, user-approved tasks assigned to this agent from Ready
+/// to InProgress before the autonomy channel starts. The store transition and
+/// expected revision make the claim atomic and visible in task history.
+async fn claim_ready_tasks_woken_by_approval(
+    deps: &AgentDeps,
+    run_id: &str,
+    config: &AutonomyConfig,
+    wake_events: &[crate::wakes::WakeEvent],
+) -> Vec<i64> {
+    if config.level != AutonomyLevel::Act {
+        return Vec::new();
+    }
+
+    let mut claimed = Vec::new();
+    for task_number in approved_task_numbers_from_wakes(wake_events, config.max_tasks_per_run) {
+        let task = match deps.task_store.get_by_number(task_number).await {
+            Ok(Some(task)) => task,
+            Ok(None) => continue,
+            Err(error) => {
+                tracing::warn!(%error, task_number, run_id, "failed to load task for autonomy claim");
+                continue;
+            }
+        };
+        if task.status != TaskStatus::Ready
+            || task.assigned_agent_id.as_deref() != Some(deps.agent_id.as_ref())
+        {
+            continue;
+        }
+
+        let context = crate::tasks::TaskMutationContext::new(
+            crate::tasks::TaskAuthorKind::Agent,
+            Some(deps.agent_id.to_string()),
+            crate::tasks::TaskMutationSource::System,
+        )
+        .with_summary(Some(format!(
+            "Claimed when assigned agent began autonomy run {run_id} after Task approved wake"
+        )))
+        .expecting(Some(task.revision));
+        let input = UpdateTaskInput {
+            status: Some(TaskStatus::InProgress),
+            context,
+            ..Default::default()
+        };
+
+        match deps
+            .task_store
+            .update_with_status_transition(task_number, input)
+            .await
+        {
+            Ok(Some(updated)) if updated.previous_status == TaskStatus::Ready
+                && updated.task.status == TaskStatus::InProgress =>
+            {
+                claimed.push(task_number);
+                tracing::info!(task_number, run_id, agent_id = %deps.agent_id, "claimed approved task for autonomy run");
+            }
+            Ok(Some(_)) | Ok(None) => {}
+            Err(error) => {
+                // A concurrent user edit wins safely through the revision CAS.
+                tracing::warn!(%error, task_number, run_id, "failed to claim approved task for autonomy run");
+            }
+        }
+    }
+    claimed
+}
+
+/// Terminally mark claims whose channel exhausted the autonomy contract. A
+/// completed task is never altered, and any concurrent update wins through the
+/// revision check. Active children remain responsible for their own lifecycle.
+async fn fail_unclosed_claimed_tasks(deps: &AgentDeps, run_id: &str, task_numbers: &[i64]) {
+    for task_number in task_numbers {
+        let task = match deps.task_store.get_by_number(*task_number).await {
+            Ok(Some(task)) => task,
+            Ok(None) => continue,
+            Err(error) => {
+                tracing::warn!(%error, task_number, run_id, "failed to reload claimed task after unclosed autonomy run");
+                continue;
+            }
+        };
+        if task.status != TaskStatus::InProgress
+            || task.assigned_agent_id.as_deref() != Some(deps.agent_id.as_ref())
+        {
+            continue;
+        }
+
+        let context = crate::tasks::TaskMutationContext::new(
+            crate::tasks::TaskAuthorKind::Agent,
+            Some(deps.agent_id.to_string()),
+            crate::tasks::TaskMutationSource::System,
+        )
+        .with_summary(Some(format!(
+            "Autonomy run {run_id} ended without autonomy_complete; inspect its recorded error before reopening"
+        )))
+        .expecting(Some(task.revision));
+        let input = UpdateTaskInput {
+            status: Some(TaskStatus::Failed),
+            context,
+            ..Default::default()
+        };
+        match deps
+            .task_store
+            .update_with_status_transition(*task_number, input)
+            .await
+        {
+            Ok(Some(updated)) if updated.task.status == TaskStatus::Failed => {
+                tracing::warn!(task_number, run_id, agent_id = %deps.agent_id, "marked unclosed autonomy claim as failed");
+            }
+            Ok(Some(_)) | Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(%error, task_number, run_id, "failed to mark unclosed autonomy claim as failed");
+            }
+        }
+    }
+}
+
 fn publish_terminal_summary(deps: &AgentDeps, run_id: &str, summary: &str) {
     let channel_id: crate::ChannelId = Arc::from(AUTONOMY_CONVERSATION_ID);
     crate::conversation::ConversationLogger::new(deps.sqlite_pool.clone()).log_bot_message_with_id(
@@ -972,5 +1128,30 @@ mod tests {
         assert!(!task_visible_to_agent(&theirs, "agent-a", true));
         assert!(task_visible_to_agent(&unowned, "agent-a", true));
         assert!(!task_visible_to_agent(&unowned, "agent-a", false));
+    }
+
+    fn wake_event(wake_id: &str, payload: serde_json::Value) -> crate::wakes::WakeEvent {
+        crate::wakes::WakeEvent {
+            id: "wake-1".to_string(),
+            wake_id: wake_id.to_string(),
+            dedupe_key: "task".to_string(),
+            payload,
+            fired_at: "2026-08-27T00:00:00Z".to_string(),
+            delivery_count: 1,
+            consumed_by: None,
+        }
+    }
+
+    #[test]
+    fn approved_wakes_select_unique_task_numbers_within_capacity() {
+        let events = vec![
+            wake_event(TASK_APPROVED_WAKE_ID, serde_json::json!({"task_number": 3})),
+            wake_event(TASK_APPROVED_WAKE_ID, serde_json::json!({"task_number": 3})),
+            wake_event("other", serde_json::json!({"task_number": 4})),
+            wake_event(TASK_APPROVED_WAKE_ID, serde_json::json!({"task_number": 5})),
+        ];
+
+        assert_eq!(approved_task_numbers_from_wakes(&events, 1), vec![3]);
+        assert_eq!(approved_task_numbers_from_wakes(&events, 2), vec![3, 5]);
     }
 }

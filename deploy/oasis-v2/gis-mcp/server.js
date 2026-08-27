@@ -9,6 +9,12 @@ import path from 'node:path';
 
 const port = Number.parseInt(process.env.PORT ?? '3011', 10);
 const workspaceRoot = path.resolve(process.env.OASIS_GIS_WORKSPACE ?? '/workspace');
+// Les agents voient le volume partagé sous /data, tandis que ce service le
+// monte sous /workspace. Ce préfixe client est remappé strictement vers le
+// même volume et ne permet jamais d'accéder à un chemin hôte arbitraire.
+const agentWorkspaceRoot = path.resolve(
+  process.env.OASIS_GIS_AGENT_WORKSPACE ?? '/data/shared-workspace',
+);
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
@@ -25,10 +31,23 @@ function asArray(value) {
   return value === undefined || value === null ? [] : Array.isArray(value) ? value : [value];
 }
 
-function workspacePath(relativePath) {
-  if (typeof relativePath !== 'string' || relativePath.trim() === '') {
+function workspacePath(requestedPath) {
+  if (typeof requestedPath !== 'string' || requestedPath.trim() === '') {
     throw new Error('Un chemin relatif à l’espace de travail est requis.');
   }
+
+  let relativePath = requestedPath.trim();
+  if (path.isAbsolute(relativePath)) {
+    const absoluteInput = path.resolve(relativePath);
+    const inputRoot = [workspaceRoot, agentWorkspaceRoot].find((root) => (
+      absoluteInput === root || absoluteInput.startsWith(`${root}${path.sep}`)
+    ));
+    if (!inputRoot) {
+      throw new Error('Le chemin doit rester dans l’espace de travail OASIS.');
+    }
+    relativePath = path.relative(inputRoot, absoluteInput);
+  }
+
   const target = path.resolve(workspaceRoot, relativePath);
   if (target !== workspaceRoot && !target.startsWith(`${workspaceRoot}${path.sep}`)) {
     throw new Error('Le chemin doit rester dans l’espace de travail OASIS.');
@@ -287,5 +306,10 @@ app.post('/mcp', async (request, response) => {
     if (!response.headersSent) response.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Erreur SIG interne' }, id: null });
   }
 });
-app.get('/health', (_request, response) => response.status(200).json({ status: 'ok', workspace: workspaceRoot, capabilities: ['inspect_kml', 'export_kml_geojson', 'project_surface_analysis'] }));
+app.get('/health', (_request, response) => response.status(200).json({
+  status: 'ok',
+  workspace: workspaceRoot,
+  accepted_agent_workspace: agentWorkspaceRoot,
+  capabilities: ['inspect_kml', 'export_kml_geojson', 'project_surface_analysis'],
+}));
 app.listen(port, () => console.log(`OASIS GIS MCP listening on port ${port}`));

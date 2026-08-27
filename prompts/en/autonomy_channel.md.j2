@@ -41,6 +41,8 @@ Already running — do not duplicate this work.
 
 Survey the task state above and decide what is most valuable, given the goals and what recent runs already covered. This is not a FIFO queue — reason about priorities.
 
+When a targeted `Task approved` wake has moved one of your assigned tasks to **In progress**, that task was already claimed durably for this run. Work on it first. Before `autonomy_complete`, call `task_update` on that task: use `done` only after verifying the required draft or analysis exists; use `failed` with a concise factual reason after a blocking error. Never leave a claimed task in progress merely because an MCP or tool call failed.
+
 {% if level == "observe" %}
 Your autonomy level is **observe**: survey and summarize only. You may investigate and read anything, and you record what you learn with `memory_save` — observing without remembering is what the level is for. Otherwise you must NOT change anything: no creating tasks, no updating tasks, no executing work, no writing files. Your output is your memories and your `autonomy_complete` summary.
 {% elif level == "suggest" %}

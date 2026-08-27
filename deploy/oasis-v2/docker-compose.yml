@@ -60,6 +60,8 @@ services:
     environment:
       PORT: "3011"
       OASIS_GIS_WORKSPACE: /workspace
+      # Chemin utilisé par les profils Spacebot, remappé vers le volume SIG /workspace.
+      OASIS_GIS_AGENT_WORKSPACE: /data/shared-workspace
     volumes:
       - ./instance/shared-workspace:/workspace:rw
     expose:

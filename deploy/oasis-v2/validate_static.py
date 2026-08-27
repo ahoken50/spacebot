@@ -18,6 +18,7 @@ autonomy_source = (repository_root / 'src' / 'agent' / 'autonomy.rs').read_text(
 channel_dispatch_source = (repository_root / 'src' / 'agent' / 'channel_dispatch.rs').read_text(encoding='utf-8')
 tools_source = (repository_root / 'src' / 'tools.rs').read_text(encoding='utf-8')
 shared_memory_source = (ROOT / 'shared-memory' / 'server.js').read_text(encoding='utf-8')
+gis_source = (ROOT / 'gis-mcp' / 'server.js').read_text(encoding='utf-8')
 shared_memory_reindex_source = (ROOT / 'shared-memory' / 'reindex_embeddings.js').read_text(encoding='utf-8')
 shared_memory_dockerfile = (ROOT / 'shared-memory' / 'Dockerfile').read_text(encoding='utf-8')
 shared_memory_package = json.loads((ROOT / 'shared-memory' / 'package.json').read_text(encoding='utf-8'))
@@ -97,6 +98,9 @@ assert '- SYS_ADMIN' in compose, 'Bubblewrap nécessite SYS_ADMIN pour créer so
 assert '- seccomp=unconfined' in compose and '- apparmor=unconfined' in compose, 'Bubblewrap doit pouvoir effectuer ses montages de namespace dans le conteneur principal.'
 assert 'no-new-privileges:true' in compose and 'cap_drop:\n      - ALL' in compose, 'Le conteneur principal doit conserver no-new-privileges et supprimer les capacités non requises.'
 assert 'docker.sock' not in compose and './instance:/data' in compose, 'Le moteur OASIS ne doit monter que son instance locale, jamais le socket Docker.'
+assert 'OASIS_GIS_AGENT_WORKSPACE: /data/shared-workspace' in compose, 'Le service SIG doit connaître le chemin partagé vu par les profils.'
+assert "process.env.OASIS_GIS_AGENT_WORKSPACE ?? '/data/shared-workspace'" in gis_source, 'Le MCP SIG doit accepter seulement le chemin partagé explicitement configuré.'
+assert 'const inputRoot = [workspaceRoot, agentWorkspaceRoot].find' in gis_source and 'path.relative(inputRoot, absoluteInput)' in gis_source, 'Le MCP SIG doit remapper les chemins agents vers son volume sans élargir le périmètre.'
 for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:', 'oasis-failure-remediator:', 'oasis-approval-bridge:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
@@ -211,6 +215,8 @@ for expected_tool in (
 ):
     assert expected_tool in skill_texts, f'Outil MCP préfixé absent des compétences : {expected_tool}'
 assert '/data/shared-workspace/<chemin-relatif>' in skill_texts, 'Les compétences doivent distinguer le chemin absolu File du chemin relatif du studio documentaire.'
+pse_sig_skill = (ROOT / 'profile-skills' / 'oasis-pse-sig' / 'SKILL.md').read_text(encoding='utf-8')
+assert 'Lire le KML **sur place**' in pse_sig_skill and '`04_pse_sig/02_kml_geojson/KML_OASIS-V2_Val-dOr.kml`' in pse_sig_skill, 'Le profil PSE/SIG doit travailler sur le KML inventorié sans le déplacer.'
 coordination_skill = (ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md').read_text(encoding='utf-8')
 assert 'sans déléguer' in coordination_skill and 'ne pas appeler l’outil de délégation' in coordination_skill, 'Le coordonnateur doit respecter une consigne explicite de non-délégation.'
 assert '/data/shared-workspace/01_sources/00_inbox' in coordination_skill, 'Le coordonnateur doit lire l’inbox depuis l’espace partagé, jamais son workspace privé.'
@@ -220,6 +226,9 @@ assert 'appeler **immédiatement** `send_agent_message` vers cet agent' in coord
 assert 'tâche Ready auditée et attribuée à l’agent spécialiste' in coordination_skill, 'La délégation interagent doit rester traçable.'
 assert 'maybe_run_autonomy_with_trigger(deps, true).await;' in autonomy_source, 'Un réveil interagent doit déclencher un examen immédiat des tâches Ready.'
 assert 'if !triggered\n        && !autonomy_run_due(' in autonomy_source, 'Seul un déclencheur explicite peut court-circuiter l’intervalle Cortex.'
+assert 'claim_ready_tasks_woken_by_approval' in autonomy_source and 'TASK_APPROVED_WAKE_ID' in autonomy_source, 'Un réveil de tâche approuvée doit revendiquer de manière atomique le mandat attribué.'
+assert 'status: Some(TaskStatus::InProgress)' in autonomy_source and 'fail_unclosed_claimed_tasks' in autonomy_source, 'Une tâche revendiquée doit être visible en cours puis clôturée explicitement si le cycle échoue.'
+assert 'Never leave a claimed task in progress merely because an MCP or tool call failed.' in (repository_root / 'prompts' / 'en' / 'autonomy_channel.md.j2').read_text(encoding='utf-8'), 'Le prompt d’autonomie doit exiger une clôture Done ou Failed du mandat revendiqué.'
 assert 'const MAX_BRANCH_WALL_CLOCK_TIMEOUT_SECS: u64 = 300;' in channel_dispatch_source, 'Les branches OASIS doivent avoir une limite de durée stricte.'
 assert 'tokio::time::timeout(' in channel_dispatch_source and 'Branch timed out after {branch_timeout_secs}s without a conclusion.' in channel_dispatch_source, 'Une branche bloquée doit émettre une terminaison et libérer sa capacité.'
 assert 'if branches.len() >= max_branches {' in channel_dispatch_source, 'La limite de branches doit être revérifiée atomiquement avant le lancement.'

@@ -15,12 +15,13 @@ Les valeurs initiales documentées sont **1,41 ha** d’infrastructures vertes p
 
 ## Calculer les superficies du KML
 
-1. Déposer le KML dans `01_sources/05_sig_et_donnees/` puis utiliser `oasis_gis_local_inspect_kml` pour dresser l’inventaire local des objets, noms, surfaces brutes et erreurs de lecture.
-2. Utiliser `oasis_gis_local_export_kml_geojson` pour produire une copie GeoJSON de travail dans `04_pse_sig/02_kml_geojson/`; le KML et le GeoJSON restent sur la machine locale.
-3. Créer ou importer les emprises polygonales nommées `P1`, `P2` et `P3` dans un GeoJSON. Le KML brut ne suffit pas pour attribuer tous les objets techniques aux trois projets.
-4. Utiliser `oasis_gis_local_project_surface_analysis` avec les emprises validées; il calcule les intersections géodésiques et produit un GeoJSON de contrôle.
-5. Dans un SIG municipal, classer les objets par type, dissoudre les surfaces d’un même type et éliminer les doublons ou chevauchements avant d’établir une valeur finale.
-6. Documenter les règles de classification, les formules, les captures et une contre-vérification. Inscrire le résultat dans `Calculs_SIG_PSE_OASIS_V2.xlsx` et dans la mémoire partagée avec son statut de validation.
+1. Lire le KML **sur place** — ne jamais le déplacer ni le renommer. Le chemin de référence actuel est `/data/shared-workspace/04_pse_sig/02_kml_geojson/KML_OASIS-V2_Val-dOr.kml`.
+2. Pour un outil MCP SIG, fournir de préférence le chemin **relatif** `04_pse_sig/02_kml_geojson/KML_OASIS-V2_Val-dOr.kml`. Le chemin absolu sous `/data/shared-workspace/` est aussi accepté par le MCP OASIS et est remappé strictement vers son volume de travail; aucun autre chemin absolu n’est permis.
+3. Utiliser `oasis_gis_local_inspect_kml` pour dresser l’inventaire local des objets, noms, surfaces brutes et erreurs de lecture, puis `oasis_gis_local_export_kml_geojson` pour produire une copie GeoJSON de travail dans `04_pse_sig/02_kml_geojson/`; le KML et le GeoJSON restent sur la machine locale.
+4. Créer ou importer les emprises polygonales nommées `P1`, `P2` et `P3` dans un GeoJSON. Le KML brut ne suffit pas pour attribuer tous les objets techniques aux trois projets.
+5. Utiliser `oasis_gis_local_project_surface_analysis` avec les emprises validées; il calcule les intersections géodésiques et produit un GeoJSON de contrôle.
+6. Dans un SIG municipal, classer les objets par type, dissoudre les surfaces d’un même type et éliminer les doublons ou chevauchements avant d’établir une valeur finale.
+7. Documenter les règles de classification, les formules, les captures et une contre-vérification. Inscrire le résultat dans `Calculs_SIG_PSE_OASIS_V2.xlsx` et dans la mémoire partagée avec son statut de validation.
 
 ## Calculer l’indicateur de vulnérabilité
 
