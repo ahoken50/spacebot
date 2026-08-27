@@ -15,6 +15,10 @@ repository_root = (ROOT / '..' / '..').resolve()
 channel_source = (repository_root / 'src' / 'agent' / 'channel.rs').read_text(encoding='utf-8')
 worker_source = (repository_root / 'src' / 'agent' / 'worker.rs').read_text(encoding='utf-8')
 tools_source = (repository_root / 'src' / 'tools.rs').read_text(encoding='utf-8')
+shared_memory_source = (ROOT / 'shared-memory' / 'server.js').read_text(encoding='utf-8')
+shared_memory_reindex_source = (ROOT / 'shared-memory' / 'reindex_embeddings.js').read_text(encoding='utf-8')
+shared_memory_dockerfile = (ROOT / 'shared-memory' / 'Dockerfile').read_text(encoding='utf-8')
+shared_memory_package = json.loads((ROOT / 'shared-memory' / 'package.json').read_text(encoding='utf-8'))
 main_source = (repository_root / 'src' / 'main.rs').read_text(encoding='utf-8')
 retrigger_prompt = (repository_root / 'prompts' / 'en' / 'fragments' / 'system' / 'retrigger.md.j2').read_text(encoding='utf-8')
 
@@ -51,6 +55,15 @@ assert config['defaults']['skills']['reflection']['enabled'] is False
 assert config['defaults']['cortex']['worker_wall_clock_timeout_secs'] == 600
 assert config['defaults']['autonomy']['level'] == 'suggest'
 assert config['defaults']['browser']['enabled'] is False
+
+assert 'OASIS_EMBEDDING_MODEL=voyageai/voyage-4' in (ROOT / '.env.example').read_text(encoding='utf-8'), 'Voyage 4 doit être le modèle d’embeddings documenté.'
+assert 'OASIS_EMBEDDING_MODEL: ${OASIS_EMBEDDING_MODEL:-voyageai/voyage-4}' in compose, 'Le conteneur de mémoire doit utiliser Voyage 4 par défaut.'
+assert "const embeddingModel = process.env.OASIS_EMBEDDING_MODEL ?? 'voyageai/voyage-4';" in shared_memory_source, 'Le serveur de mémoire doit employer Voyage 4 par défaut.'
+assert 'dimensions: embeddingDimensions' in shared_memory_source, 'Les dimensions pgvector doivent être demandées explicitement à OpenRouter.'
+assert 'embedding_profile TEXT NOT NULL DEFAULT' in shared_memory_source and 'embedding_profile = $6' in shared_memory_source, 'Les recherches doivent rester dans un espace vectoriel cohérent.'
+assert shared_memory_package['scripts']['reindex'] == 'node reindex_embeddings.js', 'La réindexation doit être explicitement disponible.'
+assert 'COPY server.js reindex_embeddings.js ./' in shared_memory_dockerfile, 'Le script de réindexation doit être inclus dans l’image.'
+assert 'embedding_profile IS DISTINCT FROM $1' in shared_memory_reindex_source, 'La réindexation doit cibler seulement les vecteurs d’un ancien profil.'
 
 opencode = config['defaults']['opencode']
 assert opencode['enabled'] is True

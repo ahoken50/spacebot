@@ -64,7 +64,7 @@ Le routage n’utilise aucun modèle Claude. Les modèles de génération sont s
 | Travailleurs spécialisés | `openrouter/qwen/qwen3.7-flash` | Extraction structurée, tableurs, KML, contrôles et brouillons. | Faible coût pour les tâches fréquentes et répétables. |
 | Compaction et cortex | `openrouter/mistralai/mistral-nemo` | Résumés, mémoires et signaux de gestion. | Modèle très économique; aucune décision contractuelle. |
 | Documents visuels | `openrouter/google/gemini-2.5-flash-lite` | Lecture ponctuelle de plans, scans et PDF difficiles. | Usage exceptionnel et ciblé. |
-| Embeddings communs | `qwen/qwen3-embedding-0.6b` | Recherche vectorielle multilingue dans PostgreSQL. | Généré une seule fois par contenu nouveau ou modifié, puis conservé. |
+| Embeddings communs | `voyageai/voyage-4` à 1 024 dimensions | Recherche vectorielle multilingue dans PostgreSQL. | Généré une seule fois par contenu nouveau ou modifié; la dimension stable évite une migration pgvector. |
 
 > Les données envoyées à un modèle OpenRouter restent soumises aux politiques du fournisseur retenu. Le serveur d’embeddings demande explicitement `data_collection: "deny"`; l’équipe TI doit néanmoins valider le traitement externe de documents municipaux avant de déposer des pièces confidentielles. [3]
 
@@ -192,6 +192,16 @@ Les changements durables — ajout de conteneur, MCP, dépendance, modèle, secr
 Le serveur `oasis-shared-memory` fournit à chaque travailleur quatre opérations : enregistrer un élément, rechercher sémantiquement, lire un élément et lier deux éléments. Les enregistrements structurés couvrent notamment les décisions, dépenses, contrats, appels d’offres, jalons, indicateurs, projets, livrables, réunions, risques et documents. Chaque écriture conserve l’auteur, les références de source, le statut, l’horodatage et une trace d’audit. Le contenu indexé est plafonné à 6 000 caractères et les recherches retournent des extraits de 1 200 caractères au plus, afin de ne pas injecter inutilement des documents complets dans le contexte.
 
 Les éléments susceptibles d’avoir une incidence contractuelle, financière ou réglementaire doivent être enregistrés avec le statut `pending_approval`. Seule une validation humaine peut les faire passer à `approved`. Un élément ne devient admissible au minage de références que si son `payload` confirme en plus `completed=true`, `learning_eligible=true`, une `reference_expected` structurée et des références de source. Le serveur ne fournit volontairement aucune opération de suppression physique; une correction doit créer une version remplacée ou un statut `superseded`, de façon à préserver l’audit.
+
+### Changement de modèle d’embeddings et réindexation
+
+La valeur par défaut est `voyageai/voyage-4` à **1 024 dimensions**. Le préfixe `openrouter/` est réservé au routage conversationnel interne de Spacebot : le service de mémoire appelle directement l’API OpenRouter et doit donc recevoir le slug `voyageai/voyage-4`, sans préfixe. L’API d’embeddings OpenRouter accepte le champ `dimensions` et Voyage 4 prend en charge cette dimension; elle correspond à la colonne pgvector existante et évite donc une migration de base. [3]
+
+Après la mise à jour du conteneur, exécuter une seule fois la commande suivante pour réindexer les enregistrements créés avec un ancien modèle. Elle met à jour seulement les vecteurs et leur profil d’embedding; elle ne modifie ni les sources, ni les contenus, ni les références, ni les journaux d’audit. La recherche ignore temporairement les anciens profils afin de ne jamais comparer deux espaces vectoriels incompatibles.
+
+```bash
+docker compose exec oasis-shared-memory bun run reindex
+```
 
 ## Sauvegarde et restauration
 

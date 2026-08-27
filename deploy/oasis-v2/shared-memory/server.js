@@ -11,8 +11,9 @@ const port = Number.parseInt(process.env.PORT ?? '3010', 10);
 const databaseUrl = requiredEnvironment('DATABASE_URL');
 const openRouterApiKey = requiredEnvironment('OPENROUTER_API_KEY');
 const referenceExportToken = requiredEnvironment('OASIS_MEMORY_EXPORT_TOKEN');
-const embeddingModel = process.env.OASIS_EMBEDDING_MODEL ?? 'qwen/qwen3-embedding-0.6b';
+const embeddingModel = process.env.OASIS_EMBEDDING_MODEL ?? 'voyageai/voyage-4';
 const embeddingDimensions = Number.parseInt(process.env.OASIS_EMBEDDING_DIMENSIONS ?? '1024', 10);
+const embeddingProfile = `${embeddingModel}:${embeddingDimensions}`;
 const queryEmbeddingCache = new Map();
 const QUERY_CACHE_TTL_MS = 5 * 60 * 1000;
 const QUERY_CACHE_MAX_ENTRIES = 256;
@@ -52,6 +53,7 @@ async function initializeDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  await pool.query("ALTER TABLE shared_records ADD COLUMN IF NOT EXISTS embedding_profile TEXT NOT NULL DEFAULT ''");
   await pool.query('CREATE INDEX IF NOT EXISTS shared_records_scope_index ON shared_records (scope, record_type, status)');
   await pool.query('CREATE INDEX IF NOT EXISTS shared_records_updated_index ON shared_records (updated_at DESC)');
   await pool.query(`CREATE INDEX IF NOT EXISTS shared_records_embedding_index ON shared_records USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)`);
@@ -87,6 +89,7 @@ async function embed(text) {
     body: JSON.stringify({
       model: embeddingModel,
       input: text,
+      dimensions: embeddingDimensions,
       provider: {
         allow_fallbacks: false,
         data_collection: 'deny',
@@ -158,7 +161,7 @@ function createServer() {
       // Une mise à jour identique d’une entité stable ne mérite ni nouvel embedding ni écriture d’audit.
       if (external_key) {
         const existing = await pool.query(
-          'SELECT id, external_key, record_type, scope, title, content, payload, source_references, created_by, status, created_at, updated_at FROM shared_records WHERE external_key = $1 LIMIT 1',
+          'SELECT id, external_key, record_type, scope, title, content, payload, source_references, created_by, status, embedding_profile, created_at, updated_at FROM shared_records WHERE external_key = $1 LIMIT 1',
           [external_key],
         );
         const record = existing.rows[0];
@@ -169,6 +172,7 @@ function createServer() {
           && record.content === content
           && record.created_by === created_by
           && record.status === status
+          && record.embedding_profile === embeddingProfile
           && JSON.stringify(record.payload) === JSON.stringify(payload)
           && JSON.stringify(record.source_references) === JSON.stringify(source_references)) {
           delete record.content;
@@ -183,8 +187,8 @@ function createServer() {
         `
           INSERT INTO shared_records (
             id, external_key, record_type, scope, title, content, payload,
-            source_references, created_by, status, embedding
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11::vector)
+            source_references, created_by, status, embedding, embedding_profile
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11::vector, $12)
           ON CONFLICT (external_key) DO UPDATE SET
             record_type = EXCLUDED.record_type,
             scope = EXCLUDED.scope,
@@ -195,10 +199,11 @@ function createServer() {
             created_by = EXCLUDED.created_by,
             status = EXCLUDED.status,
             embedding = EXCLUDED.embedding,
+            embedding_profile = EXCLUDED.embedding_profile,
             updated_at = now()
           RETURNING id, external_key, record_type, scope, title, status, created_at, updated_at
         `,
-        [recordId, external_key ?? null, record_type, scope, title, content, JSON.stringify(payload), JSON.stringify(source_references), created_by, status, vectorLiteral(embedding)],
+        [recordId, external_key ?? null, record_type, scope, title, content, JSON.stringify(payload), JSON.stringify(source_references), created_by, status, vectorLiteral(embedding), embeddingProfile],
       );
       const record = result.rows[0];
       await pool.query(
@@ -232,10 +237,11 @@ function createServer() {
           WHERE ($2::text IS NULL OR scope = $2)
             AND ($3::text IS NULL OR record_type = $3)
             AND ($4::text IS NULL OR status = $4)
+            AND embedding_profile = $6
           ORDER BY embedding <=> $1::vector
           LIMIT $5
         `,
-        [vectorLiteral(embedding), scope ?? null, record_type ?? null, status ?? null, limit],
+        [vectorLiteral(embedding), scope ?? null, record_type ?? null, status ?? null, limit, embeddingProfile],
       );
       const compactRecords = normalizeRecords(result.rows).map((record) => ({
         ...record,

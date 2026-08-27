@@ -30,7 +30,7 @@ services:
       PORT: "3010"
       DATABASE_URL: postgresql://oasis_memory:${OASIS_MEMORY_DB_PASSWORD:?Définir OASIS_MEMORY_DB_PASSWORD dans .env}@oasis-memory-db:5432/oasis_shared_memory
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Définir OPENROUTER_API_KEY dans .env}
-      OASIS_EMBEDDING_MODEL: ${OASIS_EMBEDDING_MODEL:-qwen/qwen3-embedding-0.6b}
+      OASIS_EMBEDDING_MODEL: ${OASIS_EMBEDDING_MODEL:-voyageai/voyage-4}
       OASIS_EMBEDDING_DIMENSIONS: ${OASIS_EMBEDDING_DIMENSIONS:-1024}
       OASIS_MEMORY_EXPORT_TOKEN: ${OASIS_MEMORY_EXPORT_TOKEN:?Définir OASIS_MEMORY_EXPORT_TOKEN dans .env}
     depends_on:

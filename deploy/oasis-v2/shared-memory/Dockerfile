@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json ./
 RUN bun install --production
 
-COPY server.js ./
+COPY server.js reindex_embeddings.js ./
 
 USER bun
 EXPOSE 3010

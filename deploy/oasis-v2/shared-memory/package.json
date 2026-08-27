@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Mémoire commune SQL-vectorielle pour les agents Spacebot OASIS-V2.",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "reindex": "node reindex_embeddings.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
