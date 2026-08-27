@@ -249,13 +249,27 @@ fn forward_sse_event(
     }
 }
 
+/// Whether an outbound response requires a messaging-adapter delivery after the
+/// dashboard SSE event has been published. Portal conversations are delivered by
+/// the SSE event bus above; routing them through `MessagingManager` is redundant
+/// and can turn a visible Portal message into a misleading adapter error.
+fn should_route_to_messaging_adapter(target: &spacebot::InboundMessage) -> bool {
+    target.adapter_key() != "portal"
+}
+
 /// Route an outbound response to the messaging adapter using the pinned target
-/// message for platform routing metadata (thread_ts, channel_id, etc.).
+/// message for platform routing metadata (thread_ts, channel_id, etc.). Portal
+/// responses are already delivered through the dashboard SSE event bus.
 async fn route_outbound(
     messaging: &std::sync::Arc<spacebot::messaging::MessagingManager>,
     target: &spacebot::InboundMessage,
     response: spacebot::OutboundResponse,
 ) {
+    if !should_route_to_messaging_adapter(target) {
+        tracing::debug!(conversation_id = %target.conversation_id, "portal response delivered through SSE");
+        return;
+    }
+
     match response {
         spacebot::OutboundResponse::Status(status) => {
             if let Err(error) = messaging.send_status(target, status).await {
@@ -3548,13 +3562,37 @@ async fn initialize_agents(
 
 #[cfg(test)]
 mod tests {
-    use super::{ActiveChannelKey, queue_deferred_injection, wait_for_startup_warmup_tasks};
+    use super::{
+        ActiveChannelKey, queue_deferred_injection, should_route_to_messaging_adapter,
+        wait_for_startup_warmup_tasks,
+    };
     use chrono::Utc;
     use spacebot::{ChannelInjection, InboundMessage, MessageContent};
     use std::collections::HashMap;
     use std::future::pending;
     use std::sync::Arc;
     use std::time::Duration;
+
+    #[test]
+    fn portal_outbound_uses_sse_without_messaging_adapter_delivery() {
+        let target = InboundMessage {
+            id: "portal-message".to_string(),
+            source: "portal".to_string(),
+            adapter: Some("portal".to_string()),
+            conversation_id: "portal:chat:oasis-coordination:session-1".to_string(),
+            sender_id: "user-1".to_string(),
+            agent_id: None,
+            content: MessageContent::Text("bonjour".to_string()),
+            timestamp: Utc::now(),
+            metadata: HashMap::new(),
+            formatted_author: None,
+        };
+
+        assert!(
+            !should_route_to_messaging_adapter(&target),
+            "le Portal remet déjà les réponses par SSE"
+        );
+    }
 
     #[tokio::test]
     async fn startup_warmup_wait_returns_false_when_tasks_finish_in_time() {

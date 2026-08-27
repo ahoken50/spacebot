@@ -65,6 +65,45 @@ struct PendingResult {
     success: bool,
 }
 
+/// Maximum result material included in a deterministic user-facing fallback.
+/// The full result remains available to the retrigger prompt and durable history.
+const RETRIGGER_VISIBLE_FALLBACK_MAX_CHARS: usize = 4_000;
+
+/// Prepare a concise result fallback when a retrigger turn fails to emit a
+/// user-visible reply. Unlike the internal summary, this intentionally omits
+/// worker and branch identifiers while preserving the useful work product.
+fn render_retrigger_visible_fallback(results: &[PendingResult]) -> Option<String> {
+    if results.is_empty() {
+        return None;
+    }
+
+    let sections = results
+        .iter()
+        .map(|result| {
+            let heading = if result.success {
+                "Le travail demandé est terminé."
+            } else {
+                "Le travail demandé n’a pas abouti."
+            };
+            let detail = result.result.trim();
+            if detail.is_empty() {
+                heading.to_string()
+            } else {
+                format!("{heading}\n\n{detail}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n---\n\n");
+
+    let mut text = format!("## Résultat\n\n{sections}");
+    if text.len() > RETRIGGER_VISIBLE_FALLBACK_MAX_CHARS {
+        let boundary = text.floor_char_boundary(RETRIGGER_VISIBLE_FALLBACK_MAX_CHARS);
+        text.truncate(boundary);
+        text.push_str("\n\n*Le résultat a été abrégé dans la conversation; le livrable produit demeure disponible dans l’espace de travail partagé.*");
+    }
+    Some(text)
+}
+
 const EVENT_LAG_WARNING_INTERVAL_SECS: u64 = 30;
 /// Ceiling on messages restored into live history when a channel starts. The
 /// compactor and chronicler trim from there under their own thresholds.
@@ -2886,18 +2925,54 @@ impl Channel {
             )
             .await?;
 
-        self.handle_agent_result(
-            turn_result.result,
-            &turn_result.skip_flag,
-            &turn_result.replied_flag,
-            is_retrigger,
-        )
-        .await;
+        let mut retrigger_delivery_succeeded = self
+            .handle_agent_result(
+                turn_result.result,
+                &turn_result.skip_flag,
+                &turn_result.replied_flag,
+                is_retrigger,
+            )
+            .await;
 
-        if turn_result
-            .replied_flag
-            .load(std::sync::atomic::Ordering::Relaxed)
+        // A completion must not remain visible only in the worker transcript.
+        // If the retrigger model did not produce a usable response, render the
+        // completed work directly through the conversation's normal output path.
+        if is_retrigger
+            && !retrigger_delivery_succeeded
+            && self.state.kind != ChannelKind::Autonomy
+            && let Some(fallback) = message
+                .metadata
+                .get("retrigger_visible_fallback")
+                .and_then(|value| value.as_str())
         {
+            if crate::tools::should_block_user_visible_text(fallback) {
+                tracing::warn!(
+                    channel_id = %self.id,
+                    "blocked deterministic retrigger fallback containing structured or tool syntax"
+                );
+            } else if let Some(leak) = crate::secrets::scrub::scan_for_leaks(fallback) {
+                tracing::warn!(
+                    channel_id = %self.id,
+                    leak_prefix = %&leak[..leak.len().min(8)],
+                    "blocked deterministic retrigger fallback matching secret pattern"
+                );
+            } else {
+                self.state
+                    .conversation_logger
+                    .log_bot_message(&self.state.channel_id, fallback);
+                retrigger_delivery_succeeded = self
+                    .send_outbound_text(
+                        fallback.to_string(),
+                        "failed to send deterministic retrigger fallback",
+                    )
+                    .await;
+            }
+        }
+
+        let replied = turn_result
+            .replied_flag
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if replied {
             let humans = self.deps.humans.load();
             let user_id = decision_user_id(humans.as_ref(), &message, is_retrigger);
             self.record_decision_event(turn_result.reply_text.as_deref(), user_id);
@@ -2936,14 +3011,12 @@ impl Channel {
         // path, we skip summary injection to avoid replacing user-visible wording
         // with raw worker output.
         //
-        // If relay failed (replied=false), or if we couldn't extract a clean
-        // reply content payload, this fallback preserves a compact background
-        // result record for the next user turn.
+        // If no response could be delivered, preserve a compact background
+        // record for the next user turn. A deterministic user-facing fallback
+        // is attempted first for normal conversational channels.
         if is_retrigger {
-            let replied = turn_result
-                .replied_flag
-                .load(std::sync::atomic::Ordering::Relaxed);
             let is_autonomy = self.state.kind == ChannelKind::Autonomy;
+            let relay_delivered = replied || retrigger_delivery_succeeded;
             if replied && turn_result.retrigger_reply_preserved {
                 tracing::debug!(
                     channel_id = %self.id,
@@ -2959,7 +3032,7 @@ impl Channel {
                     .and_then(|v| v.as_str())
                     .unwrap_or("[background work completed]");
 
-                let record = if replied {
+                let record = if relay_delivered {
                     summary.to_string()
                 } else if is_autonomy {
                     // Autonomy channels have no reply tool, so a retrigger turn
@@ -2990,6 +3063,7 @@ impl Channel {
                     channel_id = %self.id,
                     replaced_bridge = replaced,
                     replied,
+                    relay_delivered,
                     "injecting retrigger summary into history"
                 );
                 history.push(rig::message::Message::Assistant {
@@ -3006,7 +3080,7 @@ impl Channel {
             // now recorded in history (either via the reply path or the record
             // above), so marking them prevents the same results being
             // re-injected on every subsequent turn of the run.
-            if (replied || is_autonomy)
+            if (relay_delivered || is_autonomy)
                 && let Some(ids) = message
                     .metadata
                     .get("retrigger_process_ids")
@@ -3793,8 +3867,9 @@ impl Channel {
         })
     }
 
-    /// Send outbound text and record send metrics.
-    async fn send_outbound_text(&self, text: String, error_context: &str) {
+    /// Send outbound text, record send metrics, and report whether the
+    /// conversation output channel accepted the message for delivery.
+    async fn send_outbound_text(&self, text: String, error_context: &str) -> bool {
         match self.send_routed(OutboundResponse::Text(text)).await {
             Ok(()) => {
                 #[cfg(feature = "metrics")]
@@ -3805,6 +3880,7 @@ impl Channel {
                         .with_label_values(&[&self.deps.agent_id, channel_type])
                         .inc();
                 }
+                true
             }
             Err(error) => {
                 #[cfg(feature = "metrics")]
@@ -3816,6 +3892,7 @@ impl Channel {
                         .inc();
                 }
                 tracing::error!(%error, channel_id = %self.id, "{error_context}");
+                false
             }
         }
     }
@@ -3833,13 +3910,15 @@ impl Channel {
         skip_flag: &crate::tools::SkipFlag,
         replied_flag: &crate::tools::RepliedFlag,
         is_retrigger: bool,
-    ) {
+    ) -> bool {
         #[cfg(feature = "metrics")]
         let metrics = crate::telemetry::Metrics::global();
         #[cfg(feature = "metrics")]
         let metrics_agent_id: &str = &self.deps.agent_id;
         #[cfg(feature = "metrics")]
         let metrics_channel_type = self.current_adapter().unwrap_or("unknown");
+
+        let mut user_visible_output_delivered = false;
 
         match result {
             Ok(response) => {
@@ -3895,11 +3974,12 @@ impl Channel {
                                 self.state
                                     .conversation_logger
                                     .log_bot_message(&self.state.channel_id, &final_text);
-                                self.send_outbound_text(
-                                    final_text,
-                                    "failed to send retrigger fallback reply",
-                                )
-                                .await;
+                                user_visible_output_delivered = self
+                                    .send_outbound_text(
+                                        final_text,
+                                        "failed to send retrigger fallback reply",
+                                    )
+                                    .await;
                             }
                         }
                     } else {
@@ -3911,6 +3991,7 @@ impl Channel {
                 } else if skipped {
                     tracing::debug!(channel_id = %self.id, "channel turn skipped (no response)");
                 } else if replied {
+                    user_visible_output_delivered = true;
                     #[cfg(feature = "metrics")]
                     metrics
                         .messages_sent_total
@@ -3960,11 +4041,12 @@ impl Channel {
                                 self.state
                                     .conversation_logger
                                     .log_bot_message(&self.state.channel_id, &final_text);
-                                self.send_outbound_text(
-                                    final_text,
-                                    "failed to send retrigger fallback reply",
-                                )
-                                .await;
+                                user_visible_output_delivered = self
+                                    .send_outbound_text(
+                                        final_text,
+                                        "failed to send retrigger fallback reply",
+                                    )
+                                    .await;
                             }
                         }
                     } else {
@@ -4020,7 +4102,8 @@ impl Channel {
                                     Some(self.agent_display_name()),
                                     tool_calls_json,
                                 );
-                            self.send_outbound_text(final_text, "failed to send fallback reply")
+                            user_visible_output_delivered = self
+                                .send_outbound_text(final_text, "failed to send fallback reply")
                                 .await;
                         }
                     }
@@ -4038,6 +4121,7 @@ impl Channel {
             }
             Err(rig::completion::PromptError::PromptCancelled { reason, .. }) => {
                 if reason == "reply delivered" {
+                    user_visible_output_delivered = true;
                     #[cfg(feature = "metrics")]
                     metrics
                         .messages_sent_total
@@ -4069,6 +4153,8 @@ impl Channel {
         self.send_routed(OutboundResponse::Status(crate::StatusUpdate::StopTyping))
             .await
             .ok();
+
+        user_visible_output_delivered
     }
 
     /// Handle a process event (branch results, worker completions, status updates).
@@ -4525,6 +4611,12 @@ impl Channel {
             "retrigger_result_summary".to_string(),
             serde_json::Value::String(result_summary),
         );
+        if let Some(fallback) = render_retrigger_visible_fallback(&self.pending_results) {
+            metadata.insert(
+                "retrigger_visible_fallback".to_string(),
+                serde_json::Value::String(fallback),
+            );
+        }
         metadata.insert(
             "retrigger_process_ids".to_string(),
             serde_json::json!(retrigger_process_ids),
@@ -4934,10 +5026,11 @@ fn is_dm_conversation_id(conv_id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        ObserveModeFallbackState, ReflectionSignal, branch_working_memory_event_summary,
-        classify_conversational_event_summary, compute_listen_mode_invocation, decision_user_id,
-        extract_decision_summary_from_reply, format_conversational_event_summary,
-        is_dm_conversation_id, recv_channel_event, should_process_event_for_channel,
+        ObserveModeFallbackState, PendingResult, ReflectionSignal,
+        branch_working_memory_event_summary, classify_conversational_event_summary,
+        compute_listen_mode_invocation, decision_user_id, extract_decision_summary_from_reply,
+        format_conversational_event_summary, is_dm_conversation_id, recv_channel_event,
+        render_retrigger_visible_fallback, should_process_event_for_channel,
         should_send_discord_quiet_mode_ping_ack, should_send_quiet_mode_fallback,
         worker_outcome_already_consumed,
     };
@@ -4968,6 +5061,21 @@ mod tests {
             metadata: message_metadata,
             formatted_author: None,
         }
+    }
+
+    #[test]
+    fn retrigger_fallback_surfaces_completed_work_without_internal_identifier() {
+        let rendered = render_retrigger_visible_fallback(&[PendingResult {
+            process_type: "worker",
+            process_id: "worker-internal-id".to_string(),
+            result: "Le brouillon de cadrage est prêt dans 02_planification/.".to_string(),
+            success: true,
+        }])
+        .expect("un résultat non vide doit produire une restitution");
+
+        assert!(rendered.starts_with("## Résultat\n\nLe travail demandé est terminé."));
+        assert!(rendered.contains("Le brouillon de cadrage est prêt"));
+        assert!(!rendered.contains("worker-internal-id"));
     }
 
     #[test]

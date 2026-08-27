@@ -11,6 +11,10 @@ ROOT = Path(__file__).resolve().parent
 config = tomllib.loads((ROOT / 'config.toml.example').read_text(encoding='utf-8'))
 compose = (ROOT / 'docker-compose.yml').read_text(encoding='utf-8')
 root_dockerfile = (ROOT / '..' / '..' / 'Dockerfile').resolve().read_text(encoding='utf-8')
+repository_root = (ROOT / '..' / '..').resolve()
+channel_source = (repository_root / 'src' / 'agent' / 'channel.rs').read_text(encoding='utf-8')
+main_source = (repository_root / 'src' / 'main.rs').read_text(encoding='utf-8')
+retrigger_prompt = (repository_root / 'prompts' / 'en' / 'fragments' / 'system' / 'retrigger.md.j2').read_text(encoding='utf-8')
 
 agents = config['agents']
 agent_ids = {agent['id'] for agent in agents}
@@ -195,6 +199,11 @@ assert 'sans déléguer' in coordination_skill and 'ne pas appeler l’outil de 
 assert '/data/shared-workspace/01_sources/00_inbox' in coordination_skill, 'Le coordonnateur doit lire l’inbox depuis l’espace partagé, jamais son workspace privé.'
 assert 'oasis_shared_memory_search_shared_memory' in coordination_skill, 'Le flux direct doit interroger la mémoire avec le nom MCP préfixé.'
 assert 'ne jamais appeler `wait`, `echo`, `sleep`, `poll`' in coordination_skill, 'Le coordonnateur doit interdire les pseudo-outils de suivi.'
+assert 'Immediately deliver that synthesis to the user with the `reply` tool.' in retrigger_prompt, 'La relance doit demander une réponse visible immédiate.'
+assert '`wait`, `echo`, `sleep`, `poll`' in retrigger_prompt, 'La relance doit interdire les pseudo-outils de suivi.'
+assert 'render_retrigger_visible_fallback' in channel_source, 'Le canal doit disposer d’un secours de restitution de worker.'
+assert 'retrigger_visible_fallback' in channel_source, 'Le secours de restitution doit être transmis par la relance.'
+assert 'should_route_to_messaging_adapter' in main_source and 'target.adapter_key() != "portal"' in main_source, 'Le Portal doit utiliser SSE sans double livraison par adaptateur.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
 assert bootstrap.count('oasis-python-workbench') == 6, 'La compétence Python doit être préchargée pour les six profils.'
 assert 'workspace/skills' in bootstrap and 'approved-skill-overlays' in bootstrap, 'Les compétences de profil et recouvrements approuvés doivent être préparés dans les workspaces privés.'
