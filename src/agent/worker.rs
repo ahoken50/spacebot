@@ -922,6 +922,30 @@ impl Worker {
         let mut follow_up_blocked: Option<BlockSignalData> = None;
         if let Some(mut input_rx) = self.input_rx.take() {
             if !resuming {
+                // A fresh interactive worker remains available for follow-up,
+                // but its first completed task must still be relayed immediately
+                // to the parent channel. Without this event, the result is visible
+                // only in the worker panel until the worker is explicitly closed.
+                let scrubbed = if let Some(store) =
+                    self.deps.runtime_config.secrets.load().as_ref().as_ref()
+                {
+                    crate::secrets::scrub::scrub_with_store(&result, store, &self.deps.agent_id)
+                } else {
+                    result.clone()
+                };
+                let scrubbed = crate::secrets::scrub::scrub_leaks(&scrubbed);
+                if !scrubbed.trim().is_empty() {
+                    self.deps
+                        .event_tx
+                        .send(crate::ProcessEvent::WorkerInitialResult {
+                            agent_id: self.deps.agent_id.clone(),
+                            worker_id: self.id,
+                            channel_id: self.channel_id.clone(),
+                            result: scrubbed,
+                        })
+                        .ok();
+                }
+
                 // Fresh worker: persist transcript and signal idle for the first time.
                 // Resumed workers already did this in the preamble above.
                 self.state = WorkerState::WaitingForInput;
