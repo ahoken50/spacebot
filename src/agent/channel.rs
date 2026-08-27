@@ -36,6 +36,7 @@ use rig::agent::AgentBuilder;
 use rig::completion::CompletionModel;
 use rig::message::UserContent;
 use rig::one_or_many::OneOrMany;
+use rig::tool::Tool as _;
 use rig::tool::server::ToolServer;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -3563,6 +3564,11 @@ impl Channel {
             .clone()
             .unwrap_or_else(InboundMessage::empty);
         let routed_sender = RoutedSender::new(self.response_tx.clone(), current_inbound.clone());
+        // Keep the registered MCP snapshot and its exposed names together for
+        // this turn. The names are used to remove the exact adapters after the
+        // model returns, including unique OASIS compatibility aliases.
+        let mcp_tools = self.deps.mcp_manager.get_tools().await;
+        let mcp_tool_names = mcp_tools.iter().map(|tool| tool.name()).collect::<Vec<_>>();
 
         // Extract Slack thread_ts from the current inbound message so cron
         // delivery targets include the originating thread.
@@ -3587,6 +3593,7 @@ impl Channel {
                     &self.tool_server,
                     self.state.clone(),
                     routed_sender,
+                    mcp_tools,
                     reply_target,
                     conversation_id,
                     skip_flag.clone(),
@@ -3611,6 +3618,7 @@ impl Channel {
                     &self.tool_server,
                     self.state.clone(),
                     routed_sender,
+                    mcp_tools,
                     reply_target,
                     conversation_id,
                     skip_flag.clone(),
@@ -3834,10 +3842,20 @@ impl Channel {
 
         let remove_result = match self.resolved_settings.delegation {
             DelegationMode::Direct => {
-                crate::tools::remove_direct_mode_tools(&self.tool_server, allow_direct_reply).await
+                crate::tools::remove_direct_mode_tools(
+                    &self.tool_server,
+                    allow_direct_reply,
+                    &mcp_tool_names,
+                )
+                .await
             }
             DelegationMode::Standard => {
-                crate::tools::remove_channel_tools(&self.tool_server, allow_direct_reply).await
+                crate::tools::remove_channel_tools(
+                    &self.tool_server,
+                    allow_direct_reply,
+                    &mcp_tool_names,
+                )
+                .await
             }
         };
         if let Err(error) = remove_result {

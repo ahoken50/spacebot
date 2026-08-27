@@ -14,6 +14,7 @@ root_dockerfile = (ROOT / '..' / '..' / 'Dockerfile').resolve().read_text(encodi
 repository_root = (ROOT / '..' / '..').resolve()
 channel_source = (repository_root / 'src' / 'agent' / 'channel.rs').read_text(encoding='utf-8')
 worker_source = (repository_root / 'src' / 'agent' / 'worker.rs').read_text(encoding='utf-8')
+tools_source = (repository_root / 'src' / 'tools.rs').read_text(encoding='utf-8')
 main_source = (repository_root / 'src' / 'main.rs').read_text(encoding='utf-8')
 retrigger_prompt = (repository_root / 'prompts' / 'en' / 'fragments' / 'system' / 'retrigger.md.j2').read_text(encoding='utf-8')
 
@@ -204,10 +205,16 @@ assert 'Immediately deliver that synthesis to the user with the `reply` tool.' i
 assert '`wait`, `echo`, `sleep`, `poll`' in retrigger_prompt, 'La relance doit interdire les pseudo-outils de suivi.'
 assert 'render_retrigger_visible_fallback' in channel_source, 'Le canal doit disposer d’un secours de restitution de worker.'
 assert 'retrigger_visible_fallback' in channel_source, 'Le secours de restitution doit être transmis par la relance.'
+assert 'let mcp_tools = self.deps.mcp_manager.get_tools().await;' in channel_source, 'Le canal doit charger les MCP connectés pour chaque tour.'
+assert 'mcp_tools,' in channel_source, 'Le canal doit transmettre le snapshot MCP aux fabriques d’outils.'
+assert 'mcp_tools: Vec<McpToolAdapter>' in tools_source, 'Les fabriques d’outils de canal doivent accepter les MCP connectés.'
+assert 'for mcp_tool in mcp_tools {' in tools_source and 'handle.add_tool(mcp_tool).await?;' in tools_source, 'Le canal doit enregistrer les MCP connectés.'
+assert 'mcp_tool_names: &[String]' in tools_source and 'remove_optional_tool(handle, tool_name).await;' in tools_source, 'Les MCP doivent être retirés après le tour du canal.'
 assert 'A fresh interactive worker remains available for follow-up' in worker_source, 'Le premier résultat d’un worker interactif doit être relayé avant son attente.'
 initial_relay = worker_source.index('A fresh interactive worker remains available for follow-up')
 wait_for_input = worker_source.index('self.hook.send_status("waiting for input")', initial_relay)
 assert 'ProcessEvent::WorkerInitialResult' in worker_source[initial_relay:wait_for_input], 'Le worker interactif doit émettre son premier résultat avant de passer en attente.'
+assert 'available directly in this conversation and to builtin workers' in (repository_root / 'prompts' / 'en' / 'fragments' / 'worker_capabilities.md.j2').read_text(encoding='utf-8'), 'Le prompt doit confirmer l’accès MCP direct dans Portal.'
 assert 'should_route_to_messaging_adapter' in main_source and 'target.adapter_key() != "portal"' in main_source, 'Le Portal doit utiliser SSE sans double livraison par adaptateur.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
 assert bootstrap.count('oasis-python-workbench') == 6, 'La compétence Python doit être préchargée pour les six profils.'

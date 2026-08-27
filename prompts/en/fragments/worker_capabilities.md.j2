@@ -26,6 +26,8 @@ When you spawn a worker, it runs independently with a task description and retur
 {%- if mcp_tool_names %}
 
 **MCP tools** (from connected external servers):
+
+These configured MCP tools are available directly in this conversation and to builtin workers. Invoke the exact exposed name below for focused tasks such as shared-memory search or save; do not spawn a worker solely to call an MCP tool.
 {%- for tool in mcp_tool_names %}
 - {{ tool }}
 {%- endfor %}

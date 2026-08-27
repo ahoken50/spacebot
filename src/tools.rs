@@ -6,10 +6,12 @@
 //! ## ToolServer Topology
 //!
 //! **Channel ToolServer** (one per channel):
-//! - `reply`, `branch`, `spawn_worker`, `route`, `cancel`, `skip`, `react`, `restart` — added
-//!   dynamically per conversation turn via `add_channel_tools()` /
-//!   `remove_channel_tools()` because they hold per-channel state.
-//! - No memory tools — the channel delegates memory work to branches.
+//! - `reply`, `branch`, `spawn_worker`, `route`, `cancel`, `skip`, `react`, `restart`, and
+//!   connected MCP tools — added dynamically per conversation turn via
+//!   `add_channel_tools()` / `remove_channel_tools()` because the former tools
+//!   hold per-channel state and the latter can change after MCP reconnection.
+//! - Built-in memory mutation remains delegated to branches, but connected MCP
+//!   tools are available directly when configured for the agent.
 //!
 //! **Branch ToolServer** (one per branch, isolated):
 //! - `memory_save` + `memory_recall` + `memory_delete` + `memory_consolidate`
@@ -495,6 +497,7 @@ pub async fn add_channel_tools(
     handle: &ToolServerHandle,
     state: ChannelState,
     response_tx: RoutedSender,
+    mcp_tools: Vec<McpToolAdapter>,
     reply_target: ReplyTarget,
     conversation_id: impl Into<String>,
     skip_flag: SkipFlag,
@@ -654,6 +657,13 @@ pub async fn add_channel_tools(
         agent_msg = agent_msg.with_skip_flag(skip_flag.clone());
         handle.add_tool(agent_msg).await?;
     }
+    // MCP tools are stateless adapters. Register the connected snapshot for
+    // this turn so normal Portal conversations can use configured capabilities
+    // (for example OASIS shared memory) without creating a worker.
+    for mcp_tool in mcp_tools {
+        handle.add_tool(mcp_tool).await?;
+    }
+
     if channel_kind == crate::agent::channel::ChannelKind::Cron
         && let Some(outcome) = cron_outcome
     {
@@ -691,6 +701,7 @@ pub async fn add_direct_mode_tools(
     handle: &ToolServerHandle,
     state: ChannelState,
     response_tx: RoutedSender,
+    mcp_tools: Vec<McpToolAdapter>,
     reply_target: ReplyTarget,
     conversation_id: impl Into<String>,
     skip_flag: SkipFlag,
@@ -708,6 +719,7 @@ pub async fn add_direct_mode_tools(
         handle,
         state.clone(),
         response_tx.clone(),
+        mcp_tools,
         reply_target,
         conversation_id,
         skip_flag.clone(),
@@ -909,6 +921,7 @@ async fn remove_optional_tool(handle: &ToolServerHandle, tool_name: &str) {
 pub async fn remove_channel_tools(
     handle: &ToolServerHandle,
     allow_direct_reply: bool,
+    mcp_tool_names: &[String],
 ) -> Result<(), rig::tool::server::ToolServerError> {
     if allow_direct_reply {
         handle.remove_tool(ReplyTool::NAME).await?;
@@ -935,6 +948,9 @@ pub async fn remove_channel_tools(
     remove_optional_tool(handle, InstallSkillTool::NAME).await;
     remove_optional_tool(handle, RestartTool::NAME).await;
     remove_optional_tool(handle, ChronicleTool::NAME).await;
+    for tool_name in mcp_tool_names {
+        remove_optional_tool(handle, tool_name).await;
+    }
     Ok(())
 }
 
@@ -942,9 +958,10 @@ pub async fn remove_channel_tools(
 pub async fn remove_direct_mode_tools(
     handle: &ToolServerHandle,
     allow_direct_reply: bool,
+    mcp_tool_names: &[String],
 ) -> Result<(), rig::tool::server::ToolServerError> {
     // Remove standard channel tools first
-    remove_channel_tools(handle, allow_direct_reply).await?;
+    remove_channel_tools(handle, allow_direct_reply, mcp_tool_names).await?;
 
     // Memory tools
     remove_optional_tool(handle, MemoryRecallTool::NAME).await;
