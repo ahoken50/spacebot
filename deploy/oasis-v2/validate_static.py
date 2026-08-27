@@ -14,6 +14,7 @@ root_dockerfile = (ROOT / '..' / '..' / 'Dockerfile').resolve().read_text(encodi
 repository_root = (ROOT / '..' / '..').resolve()
 channel_source = (repository_root / 'src' / 'agent' / 'channel.rs').read_text(encoding='utf-8')
 worker_source = (repository_root / 'src' / 'agent' / 'worker.rs').read_text(encoding='utf-8')
+autonomy_source = (repository_root / 'src' / 'agent' / 'autonomy.rs').read_text(encoding='utf-8')
 tools_source = (repository_root / 'src' / 'tools.rs').read_text(encoding='utf-8')
 shared_memory_source = (ROOT / 'shared-memory' / 'server.js').read_text(encoding='utf-8')
 shared_memory_reindex_source = (ROOT / 'shared-memory' / 'reindex_embeddings.js').read_text(encoding='utf-8')
@@ -53,7 +54,7 @@ assert chronicle['chronicle']['context_token_budget'] == 1200
 assert config['defaults']['memory_persistence']['enabled'] is False
 assert config['defaults']['skills']['reflection']['enabled'] is False
 assert config['defaults']['cortex']['worker_wall_clock_timeout_secs'] == 600
-assert config['defaults']['autonomy']['level'] == 'suggest'
+assert config['defaults']['autonomy']['level'] == 'act', 'Les tâches Ready attribuées à un profil doivent pouvoir être exécutées.'
 assert config['defaults']['browser']['enabled'] is False
 
 assert 'OASIS_EMBEDDING_MODEL=voyageai/voyage-4' in (ROOT / '.env.example').read_text(encoding='utf-8'), 'Voyage 4 doit être le modèle d’embeddings documenté.'
@@ -214,6 +215,10 @@ assert 'sans déléguer' in coordination_skill and 'ne pas appeler l’outil de 
 assert '/data/shared-workspace/01_sources/00_inbox' in coordination_skill, 'Le coordonnateur doit lire l’inbox depuis l’espace partagé, jamais son workspace privé.'
 assert 'oasis_shared_memory_search_shared_memory' in coordination_skill, 'Le flux direct doit interroger la mémoire avec le nom MCP préfixé.'
 assert 'ne jamais appeler `wait`, `echo`, `sleep`, `poll`' in coordination_skill, 'Le coordonnateur doit interdire les pseudo-outils de suivi.'
+assert 'appeler **immédiatement** `send_agent_message` vers cet agent' in coordination_skill, 'Le coordonnateur doit déléguer à un agent nommé plutôt que travailler localement.'
+assert 'tâche Ready auditée et attribuée à l’agent spécialiste' in coordination_skill, 'La délégation interagent doit rester traçable.'
+assert 'maybe_run_autonomy_with_trigger(deps, true).await;' in autonomy_source, 'Un réveil interagent doit déclencher un examen immédiat des tâches Ready.'
+assert 'if !triggered\n        && !autonomy_run_due(' in autonomy_source, 'Seul un déclencheur explicite peut court-circuiter l’intervalle Cortex.'
 assert 'Immediately deliver that synthesis to the user with the `reply` tool.' in retrigger_prompt, 'La relance doit demander une réponse visible immédiate.'
 assert '`wait`, `echo`, `sleep`, `poll`' in retrigger_prompt, 'La relance doit interdire les pseudo-outils de suivi.'
 assert 'render_retrigger_visible_fallback' in channel_source, 'Le canal doit disposer d’un secours de restitution de worker.'

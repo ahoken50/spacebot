@@ -156,6 +156,15 @@ pub fn task_visible_to_agent(task: &Task, agent_id: &str, claim_unowned: bool) -
 /// `has_active_run` guard sees it — the cortex tick is serial, which makes
 /// this the single-flight gate.
 pub async fn maybe_run_autonomy(deps: &AgentDeps) {
+    maybe_run_autonomy_with_trigger(deps, false).await;
+}
+
+/// Start an autonomy run after either the regular schedule has made it due or
+/// an external trigger has requested an immediate review. A triggered
+/// run still honors the autonomy level, pause switch, and single-flight guard;
+/// it merely avoids leaving an explicitly delegated ready task idle until the
+/// next long polling interval.
+async fn maybe_run_autonomy_with_trigger(deps: &AgentDeps, triggered: bool) {
     let config = **deps.runtime_config.autonomy.load();
     // The instance ceiling caps the per-agent dial without overwriting it:
     // the run executes at the intersection of the two levels.
@@ -204,15 +213,17 @@ pub async fn maybe_run_autonomy(deps: &AgentDeps) {
     let (current_hour, _timezone) =
         crate::cron::scheduler::current_hour_and_timezone(&deps.runtime_config);
 
-    if !autonomy_run_due(
-        config.level,
-        chrono::Utc::now(),
-        last_run_started_at,
-        pending_wake_events,
-        config.active_hours,
-        current_hour,
-        config.interval_secs,
-    ) {
+    if !triggered
+        && !autonomy_run_due(
+            config.level,
+            chrono::Utc::now(),
+            last_run_started_at,
+            pending_wake_events,
+            config.active_hours,
+            current_hour,
+            config.interval_secs,
+        )
+    {
         return;
     }
 
@@ -257,9 +268,11 @@ pub async fn maybe_run_autonomy(deps: &AgentDeps) {
     });
 }
 
-/// Handle an external wake by checking whether an autonomy run is due.
+/// Handle an external wake by promptly reviewing explicitly triggered work.
+/// The execution gate and single-flight guard remain in
+/// `maybe_run_autonomy_with_trigger`.
 pub async fn wake_one(deps: &AgentDeps) {
-    maybe_run_autonomy(deps).await;
+    maybe_run_autonomy_with_trigger(deps, true).await;
 }
 
 /// Execute a single autonomy run: consume pending wake events, assemble the

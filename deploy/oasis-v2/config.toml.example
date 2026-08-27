@@ -88,9 +88,10 @@ tick_interval_secs = 900
 worker_wall_clock_timeout_secs = 600
 circuit_breaker_threshold = 3
 
-# Une action contractuelle, financière ou une transmission au Ministère nécessite une approbation humaine.
+# Les tâches Ready attribuées par le coordonnateur peuvent être exécutées par les profils spécialisés.
+# Une action contractuelle, financière, SIG officielle ou une transmission au Ministère reste soumise à l’approbation humaine.
 [defaults.autonomy]
-level = "suggest"
+level = "act"
 interval_secs = 14400
 max_turns = 4
 max_tasks_per_run = 1
