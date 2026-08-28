@@ -13,7 +13,8 @@ export function GoalsCard() {
 	const {data} = useQuery({
 		queryKey: ["goals", "active"],
 		queryFn: () => api.listGoals({status: "active"}),
-		staleTime: 30_000,
+		staleTime: 5_000,
+		refetchInterval: 4_000,
 	});
 
 	const goals = data?.goals ?? [];

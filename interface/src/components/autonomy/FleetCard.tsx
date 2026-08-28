@@ -30,7 +30,8 @@ export function FleetCard({ceiling}: FleetCardProps) {
 	const {data: fleetData} = useQuery({
 		queryKey: ["autonomy-fleet"],
 		queryFn: api.autonomyFleet,
-		staleTime: 30_000,
+		staleTime: 5_000,
+		refetchInterval: 4_000,
 	});
 
 	const agents = agentsData?.agents ?? [];

@@ -22,7 +22,8 @@ export function ApprovalQueueCard({showAgent, agentId}: ApprovalQueueCardProps) 
 	const {data} = useQuery({
 		queryKey: ["autonomy-pending-tasks", agentId ?? "all"],
 		queryFn: () => api.listTasks({status: "pending_approval", agent_id: agentId}),
-		staleTime: 30_000,
+		staleTime: 5_000,
+		refetchInterval: 4_000,
 	});
 
 	const {data: goalsData} = useQuery({
@@ -48,10 +49,19 @@ export function ApprovalQueueCard({showAgent, agentId}: ApprovalQueueCardProps) 
 	const invalidate = () => {
 		queryClient.invalidateQueries({queryKey: ["autonomy-pending-tasks"]});
 		queryClient.invalidateQueries({queryKey: ["tasks"]});
+		queryClient.invalidateQueries({queryKey: ["autonomy-runs"]});
 	};
 
 	const approveMutation = useMutation({
 		mutationFn: (taskNumber: number) => api.approveTask(taskNumber),
+		onSuccess: invalidate,
+	});
+
+	const executeMutation = useMutation({
+		mutationFn: async (taskNumber: number) => {
+			await api.approveTask(taskNumber);
+			return api.executeTask(taskNumber);
+		},
 		onSuccess: invalidate,
 	});
 
@@ -67,6 +77,9 @@ export function ApprovalQueueCard({showAgent, agentId}: ApprovalQueueCardProps) 
 	const pendingResolutions = new Set<number>();
 	if (approveMutation.isPending && approveMutation.variables !== undefined) {
 		pendingResolutions.add(approveMutation.variables);
+	}
+	if (executeMutation.isPending && executeMutation.variables !== undefined) {
+		pendingResolutions.add(executeMutation.variables);
 	}
 	if (dismissMutation.isPending && dismissMutation.variables !== undefined) {
 		pendingResolutions.add(dismissMutation.variables);
@@ -140,10 +153,19 @@ export function ApprovalQueueCard({showAgent, agentId}: ApprovalQueueCardProps) 
 												size="xs"
 												variant="accent"
 												onClick={() =>
+													executeMutation.mutate(task.task_number)
+												}
+											>
+												⚡ Exécuter
+											</Button>
+											<Button
+												size="xs"
+												variant="subtle"
+												onClick={() =>
 													approveMutation.mutate(task.task_number)
 												}
 											>
-												Approve
+												Approuver
 											</Button>
 											<Button
 												size="xs"
@@ -152,7 +174,7 @@ export function ApprovalQueueCard({showAgent, agentId}: ApprovalQueueCardProps) 
 													dismissMutation.mutate(task.task_number)
 												}
 											>
-												Dismiss
+												Rejeter
 											</Button>
 										</div>
 									</div>

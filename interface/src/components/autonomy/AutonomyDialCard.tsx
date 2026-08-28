@@ -53,6 +53,8 @@ interface AutonomyDialCardProps {
 	onUpdate: (update: AutonomyUpdate) => void;
 	agentName?: string;
 	onClearHome?: () => void;
+	onForceWake?: () => void;
+	isWaking?: boolean;
 }
 
 export function AutonomyDialCard({
@@ -60,6 +62,8 @@ export function AutonomyDialCard({
 	onUpdate,
 	agentName,
 	onClearHome,
+	onForceWake,
+	isWaking,
 }: AutonomyDialCardProps) {
 	const [advancedOpen, setAdvancedOpen] = useState(false);
 	const now = useNow(1000);
@@ -87,6 +91,17 @@ export function AutonomyDialCard({
 								: "How active your agent is when you're not around."}
 						</p>
 					</div>
+					{onForceWake && (
+						<button
+							type="button"
+							onClick={onForceWake}
+							disabled={isWaking || isOff}
+							className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition-all hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+						>
+							<span className={`inline-block ${isWaking ? "animate-spin" : ""}`}>⚡</span>
+							{isWaking ? "Réveil en cours..." : "Lancer un cycle (Wake Now)"}
+						</button>
+					)}
 				</div>
 
 				<LevelDial value={level} onChange={(next) => onUpdate({level: next})} />

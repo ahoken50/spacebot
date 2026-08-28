@@ -826,6 +826,10 @@ async fn notify_completed_delegated_tasks(
                 let link_channel_id = link.channel_id_for(&delegator);
                 logger.log_system_message(&link_channel_id, &deliverable_text);
             }
+            // Réveil instantané du délégateur / coordonnateur (PubSub Mesh 1)
+            if let Some(wake_tx) = &deps.wake_tx {
+                crate::agent::wake::fire_wake(wake_tx, &delegator);
+            }
         }
     }
 }

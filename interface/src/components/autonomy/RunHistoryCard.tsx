@@ -60,7 +60,8 @@ export function RunHistoryCard({showAgent, agentId}: RunHistoryCardProps) {
 	const {data} = useQuery({
 		queryKey: ["autonomy-runs", agentId ?? "all"],
 		queryFn: () => api.autonomyRuns(agentId, 30),
-		staleTime: 30_000,
+		staleTime: 5_000,
+		refetchInterval: 4_000,
 	});
 
 	const {data: agentsData} = useQuery({

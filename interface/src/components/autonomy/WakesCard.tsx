@@ -37,7 +37,8 @@ export function WakesCard({agentId}: WakesCardProps) {
 	const {data} = useQuery({
 		queryKey: ["wakes", agentId],
 		queryFn: () => api.listWakes(agentId),
-		staleTime: 30_000,
+		staleTime: 5_000,
+		refetchInterval: 4_000,
 	});
 
 	const toggleMutation = useMutation({

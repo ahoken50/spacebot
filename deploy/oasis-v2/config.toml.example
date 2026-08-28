@@ -299,6 +299,18 @@ to = "oasis-gouvernance"
 direction = "two_way"
 kind = "peer"
 
+[[links]]
+from = "oasis-finances"
+to = "oasis-calendrier"
+direction = "two_way"
+kind = "peer"
+
+[[links]]
+from = "oasis-pse-sig"
+to = "oasis-finances"
+direction = "two_way"
+kind = "peer"
+
 [[groups]]
 name = "Pilotage de la convention"
 agent_ids = ["oasis-coordination", "oasis-finances", "oasis-calendrier", "oasis-pse-sig", "oasis-reddition", "oasis-gouvernance"]

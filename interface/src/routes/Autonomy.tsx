@@ -14,7 +14,8 @@ export function Autonomy() {
 	const {data: fleetData} = useQuery({
 		queryKey: ["autonomy-fleet"],
 		queryFn: api.autonomyFleet,
-		staleTime: 30_000,
+		staleTime: 5_000,
+		refetchInterval: 4_000,
 	});
 
 	// Undefined until fleet data loads; the cards render inert rather than

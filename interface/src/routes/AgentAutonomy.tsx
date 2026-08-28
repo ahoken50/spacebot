@@ -23,7 +23,25 @@ export function AgentAutonomy({agentId}: AgentAutonomyProps) {
 	const {data: status} = useQuery({
 		queryKey: ["autonomy-status", agentId],
 		queryFn: () => api.autonomyStatus(agentId),
-		staleTime: 30_000,
+		staleTime: 5_000,
+		refetchInterval: 4_000,
+	});
+
+	const forceWakeMutation = useMutation({
+		mutationFn: async () => {
+			// Find schedule wake or default wake to trigger
+			const wakes = await api.listWakes(agentId);
+			const targetWake = wakes.wakes.find((w) => w.enabled) ?? wakes.wakes[0];
+			if (targetWake) {
+				return api.fireWake(agentId, targetWake.id);
+			}
+			return {status: "no_wake_found"};
+		},
+		onSettled: () => {
+			queryClient.invalidateQueries({queryKey: ["autonomy-status", agentId]});
+			queryClient.invalidateQueries({queryKey: ["autonomy-runs", agentId]});
+			queryClient.invalidateQueries({queryKey: ["autonomy-fleet"]});
+		},
 	});
 
 	const agent = agentsData?.agents.find((a) => a.id === agentId);
@@ -80,6 +98,8 @@ export function AgentAutonomy({agentId}: AgentAutonomyProps) {
 						onUpdate={(update) => configMutation.mutate(update)}
 						agentName={agent?.display_name ?? agentId}
 						onClearHome={() => clearHomeMutation.mutate()}
+						onForceWake={() => forceWakeMutation.mutate()}
+						isWaking={forceWakeMutation.isPending}
 					/>
 
 					<div className="mt-5">
