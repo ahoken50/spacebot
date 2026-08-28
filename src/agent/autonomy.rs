@@ -572,8 +572,29 @@ async fn claim_ready_tasks_woken_by_approval(
         return Vec::new();
     }
 
+    let mut task_numbers = approved_task_numbers_from_wakes(wake_events, config.max_tasks_per_run);
+    if task_numbers.is_empty() {
+        // A task created through the ordinary UI/API can be Ready without a
+        // Task approved wake (creation starts PendingApproval, and a later
+        // approval may happen while this agent is restarting). Scheduled
+        // autonomy must still execute its own approved queue deterministically.
+        match deps
+            .task_store
+            .list(TaskListFilter {
+                assigned_agent_id: Some(deps.agent_id.to_string()),
+                status: Some(TaskStatus::Ready),
+                limit: Some(config.max_tasks_per_run as i64),
+                ..Default::default()
+            })
+            .await
+        {
+            Ok(ready_tasks) => task_numbers.extend(ready_tasks.into_iter().map(|task| task.task_number)),
+            Err(error) => tracing::warn!(%error, run_id, agent_id = %deps.agent_id, "failed to list assigned Ready tasks for autonomy"),
+        }
+    }
+
     let mut claimed = Vec::new();
-    for task_number in approved_task_numbers_from_wakes(wake_events, config.max_tasks_per_run) {
+    for task_number in task_numbers {
         let task = match deps.task_store.get_by_number(task_number).await {
             Ok(Some(task)) => task,
             Ok(None) => continue,

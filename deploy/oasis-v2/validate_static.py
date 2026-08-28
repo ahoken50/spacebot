@@ -234,6 +234,7 @@ assert 'maybe_run_autonomy_with_trigger(deps, true).await;' in autonomy_source, 
 assert 'if !triggered\n        && !autonomy_run_due(' in autonomy_source, 'Seul un déclencheur explicite peut court-circuiter l’intervalle Cortex.'
 assert 'claim_ready_tasks_woken_by_approval' in autonomy_source and 'TASK_APPROVED_WAKE_ID' in autonomy_source, 'Un réveil de tâche approuvée doit revendiquer de manière atomique le mandat attribué.'
 assert 'status: Some(TaskStatus::InProgress)' in autonomy_source and 'fail_unclosed_claimed_tasks' in autonomy_source, 'Une tâche revendiquée doit être visible en cours puis clôturée explicitement si le cycle échoue.'
+assert 'assigned_agent_id: Some(deps.agent_id.to_string())' in autonomy_source and 'status: Some(TaskStatus::Ready)' in autonomy_source, 'Un cycle sans wake doit examiner la file Ready attribuée à l’agent.'
 autonomy_prompt = (repository_root / 'prompts' / 'en' / 'autonomy_channel.md.j2').read_text(encoding='utf-8')
 assert 'Never leave a claimed task in progress merely because an MCP or tool call failed.' in autonomy_prompt, 'Le prompt d’autonomie doit exiger une clôture Done ou Failed du mandat revendiqué.'
 assert 'A task marked read-only, `lecture seule`, or equivalent forbids document classification' in autonomy_prompt, 'Le prompt d’autonomie doit interdire tout classement pour un mandat en lecture seule.'
