@@ -226,7 +226,7 @@ assert '`evidences`' in foundation_skill and 'ne jamais utiliser' in foundation_
 shared_memory_server = (ROOT / 'shared-memory' / 'server.js').read_text(encoding='utf-8')
 for relation in ('depends_on', 'justifies', 'measures', 'replaces', 'concerns', 'produced_by', 'approved_by', 'evidenced_by'):
     assert f"'{relation}'" in shared_memory_server, f'Relation mémoire serveur absente : {relation}'
-assert "'evidences', 'supports'" in shared_memory_server and 'canonicalRelation' in shared_memory_server, 'Les alias mémoire doivent être normalisés côté serveur.'
+assert "evidences: 'evidenced_by'" in shared_memory_server and "supports: 'justifies'" in shared_memory_server and 'canonicalRelation' in shared_memory_server, 'Les alias mémoire doivent être normalisés côté serveur.'
 assert 'normalizedRelation' in shared_memory_server, 'Le MCP mémoire doit retourner et persister une relation canonique.'
 pse_sig_skill = (ROOT / 'profile-skills' / 'oasis-pse-sig' / 'SKILL.md').read_text(encoding='utf-8')
 assert 'Lire le KML **sur place**' in pse_sig_skill and '`04_pse_sig/02_kml_geojson/KML_OASIS-V2_Val-dOr.kml`' in pse_sig_skill, 'Le profil PSE/SIG doit travailler sur le KML inventorié sans le déplacer.'
@@ -263,11 +263,9 @@ assert 'A fresh interactive worker remains available for follow-up' in worker_so
 initial_relay = worker_source.index('A fresh interactive worker remains available for follow-up')
 wait_for_input = worker_source.index('self.hook.send_status("waiting for input")', initial_relay)
 assert 'ProcessEvent::WorkerInitialResult' in worker_source[initial_relay:wait_for_input], 'Le worker interactif doit émettre son premier résultat avant de passer en attente.'
-portal_panel_source = (repository_root / 'interface' / 'src' / 'components' / 'portal' / 'PortalPanel.tsx').read_text(encoding='utf-8')
-portal_activity_source = (repository_root / 'interface' / 'src' / 'components' / 'portal' / 'PortalAutonomousActivity.tsx').read_text(encoding='utf-8')
-assert 'PortalAutonomousActivity' in portal_panel_source, 'Le Portal doit afficher l’activité autonome distinctement des workers internes.'
-assert 'api.autonomyRuns(undefined, 24)' in portal_activity_source and 'refetchInterval: 5_000' in portal_activity_source, 'La carte d’activité autonome doit interroger le flux global avec rafraîchissement.'
-assert 'status === "running"' in portal_activity_source, 'La carte doit distinguer explicitement un run autonome en cours.'
+workers_panel_source = (repository_root / 'interface' / 'src' / 'components' / 'WorkersPanel.tsx').read_text(encoding='utf-8')
+assert 'panel-tasks' in workers_panel_source and 'api.listTasks' in workers_panel_source, 'Le panneau des processus doit afficher les tâches des agents.'
+assert 'autonomy-runs' in workers_panel_source, 'Le panneau des processus doit afficher l’activité autonome.'
 assert 'available directly in this conversation and to builtin workers' in (repository_root / 'prompts' / 'en' / 'fragments' / 'worker_capabilities.md.j2').read_text(encoding='utf-8'), 'Le prompt doit confirmer l’accès MCP direct dans Portal.'
 assert 'should_route_to_messaging_adapter' in main_source and 'target.adapter_key() != "portal"' in main_source, 'Le Portal doit utiliser SSE sans double livraison par adaptateur.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')

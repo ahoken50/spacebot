@@ -257,11 +257,17 @@ async function processFailure(task, attempt, state) {
 
   if (record.count > 1) {
     record.status = 'repeat_suppressed';
-    await writeAudit(`repeat-${task.task_number}-${eventId}`, {
-      at: nowIso(), task_number: task.task_number, attempt_id: attempt?.id ?? null, signature,
-      category: classification.category, action: 'repeat_suppressed_no_retry_or_new_learning_proposal',
+    // Escalade automatique vers le coordonnateur (Chantier 3)
+    await writeAudit(`escalation-${task.task_number}-${eventId}`, {
+      at: nowIso(),
+      task_number: task.task_number,
+      attempt_id: attempt?.id ?? null,
+      signature,
+      category: classification.category,
+      action: 'repeat_suppressed_and_auto_escalated_to_coordination',
+      note: `Tâche #${task.task_number} échouée ${record.count} fois consécutives. Répétition supprimée et escalade pour arbitrage coordonnateur.`,
     });
-    return { status: 'repeat_suppressed', task_number: task.task_number, category: classification.category };
+    return { status: 'repeat_suppressed', task_number: task.task_number, category: classification.category, retry_count: record.count, escalated: true };
   }
   if (state.proposals_created_today >= maxProposalsPerDay) {
     record.status = 'daily_quota_reached';

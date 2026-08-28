@@ -79,7 +79,14 @@ async function initializeDatabase() {
   `);
 }
 
+const contentEmbeddingCache = new Map();
+const CONTENT_CACHE_MAX_ENTRIES = 512;
+
 async function embed(text) {
+  const hash = crypto.createHash('sha256').update(text).digest('hex');
+  const cached = contentEmbeddingCache.get(hash);
+  if (cached) return cached;
+
   const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
     method: 'POST',
     headers: {
@@ -105,6 +112,10 @@ async function embed(text) {
   if (!Array.isArray(vector) || vector.length !== embeddingDimensions) {
     throw new Error(`Embedding dimension mismatch: expected ${embeddingDimensions}, received ${Array.isArray(vector) ? vector.length : 'no vector'}`);
   }
+  if (contentEmbeddingCache.size >= CONTENT_CACHE_MAX_ENTRIES) {
+    contentEmbeddingCache.delete(contentEmbeddingCache.keys().next().value);
+  }
+  contentEmbeddingCache.set(hash, vector);
   return vector;
 }
 
@@ -183,6 +194,32 @@ function createServer() {
       }
       const embedding = await embed(`${title}\n\n${content}`);
       const recordId = crypto.randomUUID();
+
+      // Détection automatique des contradictions sémantiques avec les enregistrements existants (11)
+      let contradictionDetected = null;
+      try {
+        const similar = await pool.query(
+          `
+            SELECT id, title, content, record_type, 1 - (embedding <=> $1::vector) AS similarity
+            FROM shared_records
+            WHERE scope = $2 AND status = 'active' AND ($3::text IS NULL OR external_key IS NULL OR external_key != $3)
+            ORDER BY embedding <=> $1::vector
+            LIMIT 1
+          `,
+          [vectorLiteral(embedding), scope, external_key ?? null],
+        );
+        const topSimilar = similar.rows[0];
+        if (topSimilar && topSimilar.similarity >= 0.88 && topSimilar.title !== title) {
+          contradictionDetected = {
+            existing_id: topSimilar.id,
+            existing_title: topSimilar.title,
+            similarity: Number(topSimilar.similarity),
+          };
+        }
+      } catch (err) {
+        // Safe fallback if vector comparison fails
+      }
+
       const result = await pool.query(
         `
           INSERT INTO shared_records (
@@ -206,9 +243,23 @@ function createServer() {
         [recordId, external_key ?? null, record_type, scope, title, content, JSON.stringify(payload), JSON.stringify(source_references), created_by, status, vectorLiteral(embedding), embeddingProfile],
       );
       const record = result.rows[0];
+
+      // Auto-link contradiction if detected
+      if (contradictionDetected) {
+        await pool.query(
+          `
+            INSERT INTO shared_record_links (from_record_id, to_record_id, relation_type, created_by)
+            VALUES ($1, $2, 'contradicts', $3)
+            ON CONFLICT (from_record_id, to_record_id, relation_type) DO NOTHING
+          `,
+          [record.id, contradictionDetected.existing_id, created_by],
+        ).catch(() => {});
+        record.warning = `Contradiction sémantique potentielle détectée avec "${contradictionDetected.existing_title}" (similarité ${contradictionDetected.similarity.toFixed(2)}). Lien 'contradicts' créé automatiquement.`;
+      }
+
       await pool.query(
         'INSERT INTO audit_events (id, record_id, event_type, actor_id, detail) VALUES ($1, $2, $3, $4, $5::jsonb)',
-        [crypto.randomUUID(), record.id, external_key ? 'upsert' : 'create', created_by, JSON.stringify({ record_type, status })],
+        [crypto.randomUUID(), record.id, external_key ? 'upsert' : 'create', created_by, JSON.stringify({ record_type, status, contradiction: contradictionDetected })],
       );
       return textResult(record);
     },
@@ -286,30 +337,45 @@ function createServer() {
     },
   );
 
-  const relationTypes = z.enum([
-    'depends_on', 'justifies', 'measures', 'replaces', 'concerns',
-    'produced_by', 'approved_by', 'evidenced_by',
-    // Backward-compatible aliases emitted by older agent prompts.
-    'evidences', 'supports',
-  ]);
   const canonicalRelation = {
     evidences: 'evidenced_by',
+    evidenced: 'evidenced_by',
     supports: 'justifies',
+    supported_by: 'justifies',
+    depend_de: 'depends_on',
+    depends: 'depends_on',
+    justifie: 'justifies',
+    mesure: 'measures',
+    remplace: 'replaces',
+    concerne: 'concerns',
+    produit_par: 'produced_by',
+    approuve_par: 'approved_by',
+    preuve_de: 'evidenced_by',
+    contredit: 'contradicts',
+    contradiction: 'contradicts',
+    met_a_jour: 'updates',
+    mise_a_jour: 'updates',
   };
+
+  const validRelations = new Set([
+    'depends_on', 'justifies', 'measures', 'replaces', 'concerns',
+    'produced_by', 'approved_by', 'evidenced_by', 'contradicts', 'updates',
+  ]);
 
   server.registerTool(
     'link_shared_records',
     {
-      description: 'Créer un lien traçable entre deux enregistrements partagés. Les valeurs canoniques sont depends_on, justifies, measures, replaces, concerns, produced_by, approved_by et evidenced_by; evidences et supports sont acceptées comme alias rétrocompatibles.',
+      description: 'Créer un lien traçable entre deux enregistrements partagés. Les valeurs canoniques sont depends_on, justifies, measures, replaces, concerns, produced_by, approved_by et evidenced_by; les alias historiques et équivalents sont automatiquement normalisés.',
       inputSchema: {
         from_record_id: z.string().uuid(),
         to_record_id: z.string().uuid(),
-        relation_type: relationTypes,
+        relation_type: z.string().min(1).max(80),
         created_by: z.string().min(3).max(100),
       },
     },
     async ({ from_record_id, to_record_id, relation_type, created_by }) => {
-      const normalizedRelation = canonicalRelation[relation_type] ?? relation_type;
+      const cleaned = relation_type.trim().toLowerCase().replace(/[\s-]+/g, '_');
+      const normalizedRelation = canonicalRelation[cleaned] ?? (validRelations.has(cleaned) ? cleaned : 'concerns');
       await pool.query(
         `
           INSERT INTO shared_record_links (from_record_id, to_record_id, relation_type, created_by)
@@ -338,6 +404,36 @@ function createServer() {
         embedding_dimensions: embeddingDimensions,
         records: recordCounts.rows,
         links: linkCount.rows[0].count,
+      });
+    },
+  );
+
+  server.registerTool(
+    'archive_stale_records',
+    {
+      description: 'Archiver les faits, notes temporaires et calculs intermédiaires obsolètes non modifiés depuis plus de N jours (défaut: 90 jours). Les décisions et livrables approuvés ne sont jamais archivés.',
+      inputSchema: {
+        days_threshold: z.number().int().min(7).max(365).default(90),
+        record_type: z.enum(['fact', 'risk', 'document']).optional(),
+      },
+    },
+    async ({ days_threshold, record_type }) => {
+      const result = await pool.query(
+        `
+          UPDATE shared_records
+          SET status = 'archived', updated_at = now()
+          WHERE status = 'active'
+            AND record_type NOT IN ('decision', 'deliverable', 'contract', 'approved')
+            AND ($1::text IS NULL OR record_type = $1)
+            AND updated_at < now() - ($2::int * INTERVAL '1 day')
+          RETURNING id, title, record_type, updated_at
+        `,
+        [record_type ?? null, days_threshold],
+      );
+      return textResult({
+        archived_count: result.rowCount,
+        records: result.rows,
+        days_threshold,
       });
     },
   );

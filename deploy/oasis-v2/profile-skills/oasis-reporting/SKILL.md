@@ -13,7 +13,7 @@ Préparer des brouillons complets, mais ne jamais déclarer qu’un document a �
 
 ## Monter le dossier de rapport
 
-Pour chaque rapport d’étape, utiliser le gabarit ministériel et rassembler : l’état d’avancement des activités, le PSE à jour, le budget Excel mis à jour, le calendrier en vigueur et une explication des ajustements. Vérifier que la période couverte, les valeurs cumulatives et les pièces financières concordent entre les documents.
+Pour toute lecture ou rédaction, utiliser les dossiers sous le chemin absolu partagé `/data/shared-workspace/07_livrables/` (notamment `01_brouillons/`). Ne jamais chercher ces dossiers dans l'espace privé de l'agent. Pour chaque rapport d’étape, utiliser le gabarit ministériel et rassembler : l’état d’avancement des activités, le PSE à jour, le budget Excel mis à jour, le calendrier en vigueur et une explication des ajustements. Vérifier que la période couverte, les valeurs cumulatives et les pièces financières concordent entre les documents.
 
 Pour le rapport final, ajouter le plan d’entretien, les résultats finaux, le bilan des apprentissages, l’état financier exigé, les preuves de récolement et les résultats d’évaluation. Utiliser le registre partagé comme index de preuves, sans y substituer les documents sources.
 

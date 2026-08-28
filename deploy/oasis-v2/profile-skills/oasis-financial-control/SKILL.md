@@ -15,7 +15,7 @@ related_skills: [oasis-reporting, oasis-schedule-governance]
 
 ## Gérer les transactions
 
-Utiliser le classeur `Suivi_financier_OASIS_V2.xlsx` comme registre de travail. Exiger pour chaque ligne la date, la pièce justificative, le fournisseur ou employé, le code budgétaire, le projet, les montants avant taxes et taxes, la source de financement, le statut et le lien vers la preuve de paiement.
+Pour toute lecture ou modification, utiliser le chemin absolu partagé `/data/shared-workspace/03_finances/Suivi_financier_OASIS_V2.xlsx` comme registre de travail. Ne jamais chercher ce fichier dans le répertoire privé de l'agent. Exiger pour chaque ligne la date, la pièce justificative, le fournisseur ou employé, le code budgétaire, le projet, les montants avant taxes et taxes, la source de financement, le statut et le lien vers la preuve de paiement.
 
 Ne jamais classer une dépense comme admissible en l’absence d’une pièce suffisante. Utiliser `À valider` quand l’information est incomplète et préciser ce qui manque. Lorsqu’une dépense ou décision a une incidence contractuelle, l’enregistrer avec le statut `pending_approval` dans le registre commun.
 

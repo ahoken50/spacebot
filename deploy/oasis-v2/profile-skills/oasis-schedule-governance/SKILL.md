@@ -13,13 +13,13 @@ Traiter le calendrier approuvé comme la référence contractuelle. Le calendrie
 
 ## Suivre les jalons
 
-Utiliser `Calendrier_comprime_OASIS_V2.xlsx` pour l’état d’avancement et le Gantt. Pour chaque activité, documenter la date prévue, la date réelle, la dépendance, le livrable ou la preuve, le responsable, le statut et l’écart. Toute dérive qui touche le budget, un permis, un rapport, le PSE ou la fin du projet doit devenir un risque et une décision à soumettre.
+Pour toute lecture ou modification, utiliser le chemin absolu partagé `/data/shared-workspace/05_calendrier/Calendrier_comprime_OASIS_V2.xlsx` pour l’état d’avancement et le Gantt. Ne jamais chercher ce fichier dans l'espace privé de l'agent. Pour chaque activité, documenter la date prévue, la date réelle, la dépendance, le livrable ou la preuve, le responsable, le statut et l’écart. Toute dérive qui touche le budget, un permis, un rapport, le PSE ou la fin du projet doit devenir un risque et une décision à soumettre.
 
 Les dates du PSE et des rapports sont à valider en fonction de la signature effective et du début réel des activités. Ne pas présenter une date de travail comme une échéance ministérielle confirmée sans preuve.
 
 ## Gérer le comité de suivi
 
-Utiliser `Comite_suivi_OASIS_V2.xlsx` pour les membres, rencontres, actions, décisions et risques. Préparer l’ordre du jour à partir du registre des écarts, de la situation financière, des indicateurs PSE et des livrables à venir. Après chaque rencontre, inscrire les décisions, responsables, échéances, preuves et statut dans le registre partagé.
+Utiliser le chemin absolu partagé `/data/shared-workspace/02_gouvernance/Comite_suivi_OASIS_V2.xlsx` pour les membres, rencontres, actions, décisions et risques. Préparer l’ordre du jour à partir du registre des écarts, de la situation financière, des indicateurs PSE et des livrables à venir. Après chaque rencontre, inscrire les décisions, responsables, échéances, preuves et statut dans le registre partagé.
 
 Un procès-verbal demeure un brouillon tant qu’il n’est pas adopté ou validé par la personne compétente. Si un comité directeur est formé, signaler l’obligation d’inviter le représentant du Ministère selon la convention.
 
