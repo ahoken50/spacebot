@@ -88,6 +88,8 @@ services:
     environment:
       PORT: "3012"
       OASIS_DOCUMENT_WORKSPACE: /workspace
+      # Chemin utilisé par les profils Spacebot, remappé vers le volume Document Studio.
+      OASIS_DOCUMENT_AGENT_WORKSPACE: /data/shared-workspace
     volumes:
       - ./instance/shared-workspace:/workspace:rw
     expose:

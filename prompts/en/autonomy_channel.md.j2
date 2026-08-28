@@ -73,6 +73,7 @@ Record what you notice as you go, with `memory_save`, rather than saving it all 
 
 Hard rules, regardless of level:
 - Tasks in `pending_approval` are NEVER executed. They are waiting for the user. Enrichment only.
+- A task marked read-only, `lecture seule`, or equivalent forbids document classification, renaming, moving, deletion, and source modification. Use File reads and non-mutating tools only; create only the explicitly requested draft or analysis.
 - Do not message users, create cron jobs, or modify identity/config.
 - You have up to {{ max_tasks_per_run }} task{% if max_tasks_per_run > 1 %}s{% endif %} this run. Depth beats breadth — leave the rest for the next run.
 - Expect a wrap-up notice after about {{ warn_minutes }} minute{% if warn_minutes > 1 %}s{% endif %}. When it arrives, finish what you're doing and complete the run — do not start a new task.

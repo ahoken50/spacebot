@@ -8,6 +8,12 @@ import * as z from 'zod/v4';
 
 const port = Number.parseInt(process.env.PORT ?? '3012', 10);
 const workspaceRoot = path.resolve(process.env.OASIS_DOCUMENT_WORKSPACE ?? '/workspace');
+// Les profils Spacebot voient le volume sous /data, alors que ce service le
+// monte sous /workspace. Ce préfixe client est remappé strictement vers le
+// même volume; il n’autorise aucun accès à un chemin hôte externe.
+const agentWorkspaceRoot = path.resolve(
+  process.env.OASIS_DOCUMENT_AGENT_WORKSPACE ?? '/data/shared-workspace',
+);
 const templatePath = '/app/templates/oasis-reference.docx';
 const taxonomy = JSON.parse(await readFile('/app/taxonomy.json', 'utf8'));
 
@@ -15,10 +21,27 @@ function textResult(value) {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
 }
 
-function workspacePath(relativePath) {
-  if (typeof relativePath !== 'string' || relativePath.trim() === '') throw new Error('Un chemin relatif à l’espace de travail est requis.');
+function workspacePath(requestedPath) {
+  if (typeof requestedPath !== 'string' || requestedPath.trim() === '') {
+    throw new Error('Un chemin relatif à l’espace de travail est requis.');
+  }
+
+  let relativePath = requestedPath.trim();
+  if (path.isAbsolute(relativePath)) {
+    const absoluteInput = path.resolve(relativePath);
+    const inputRoot = [workspaceRoot, agentWorkspaceRoot].find((root) => (
+      absoluteInput === root || absoluteInput.startsWith(`${root}${path.sep}`)
+    ));
+    if (!inputRoot) {
+      throw new Error('Le chemin doit rester dans l’espace de travail OASIS.');
+    }
+    relativePath = path.relative(inputRoot, absoluteInput);
+  }
+
   const target = path.resolve(workspaceRoot, relativePath);
-  if (target !== workspaceRoot && !target.startsWith(`${workspaceRoot}${path.sep}`)) throw new Error('Le chemin doit rester dans l’espace de travail OASIS.');
+  if (target !== workspaceRoot && !target.startsWith(`${workspaceRoot}${path.sep}`)) {
+    throw new Error('Le chemin doit rester dans l’espace de travail OASIS.');
+  }
   return target;
 }
 
@@ -284,5 +307,10 @@ app.post('/mcp', async (request, response) => {
     if (!response.headersSent) response.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Erreur documentaire interne' }, id: null });
   }
 });
-app.get('/health', (_request, response) => response.status(200).json({ status: 'ok', capabilities: ['get_document_taxonomy', 'classify_workspace_document', 'create_document_brief', 'render_markdown_document', 'render_document_preview', 'check_document_quality'] }));
+app.get('/health', (_request, response) => response.status(200).json({
+  status: 'ok',
+  workspace: workspaceRoot,
+  accepted_agent_workspace: agentWorkspaceRoot,
+  capabilities: ['get_document_taxonomy', 'classify_workspace_document', 'create_document_brief', 'render_markdown_document', 'render_document_preview', 'check_document_quality'],
+}));
 app.listen(port, () => console.log(`OASIS document studio MCP listening on port ${port}`));

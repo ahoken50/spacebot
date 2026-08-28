@@ -11,14 +11,15 @@ related_skills: [oasis-reporting, oasis-financial-control, oasis-pse-sig]
 
 Pour tout document important, suivre impérativement cette séquence :
 
-1. Créer un manifeste avec `oasis_document_studio_create_document_brief` : objectif, destinataire, sections, sources et formats attendus.
-2. Utiliser uniquement des chemins **relatifs** à l’espace documentaire, par exemple `01_sources/00_inbox/fichier.docx` ou `07_livrables/01_brouillons/note.md`; ne jamais transmettre un chemin commençant par `/data/shared-workspace/`.
-3. Rédiger un brouillon Markdown cohérent dans `07_livrables/01_brouillons/`. Utiliser des titres hiérarchisés, des tableaux pour les résultats, et des références de source vérifiables.
-4. Ne jamais inventer un montant, une date, une décision, une superficie ou un résultat. Utiliser `À valider` et consigner l’information manquante dans la mémoire commune avec `oasis_shared_memory_save_shared_record`.
-5. Appeler `oasis_document_studio_render_markdown_document` pour créer le DOCX et/ou le PDF avec la charte OASIS. Le rendu est réalisé localement par Pandoc et LibreOffice; le document source n’est pas transmis à un moteur de rendu externe.
-6. Appeler `oasis_document_studio_check_document_quality`. Corriger tout avertissement avant de présenter le livrable comme prêt.
-7. Appeler `oasis_document_studio_render_document_preview` et examiner visuellement au minimum la page titre, les tableaux larges, les pages contenant figures ou images, et la dernière page.
-8. Enregistrer dans la mémoire partagée le chemin relatif du livrable, les sources, la version, le résultat du contrôle qualité et le statut d’approbation.
+1. Si le mandat indique **lecture seule**, lire les sources avec l’outil File et employer seulement les MCP de lecture ou de rendu applicables. Ne jamais appeler `oasis_document_studio_classify_workspace_document`, renommer, déplacer ou supprimer une source; créer uniquement le brouillon explicitement demandé.
+2. Pour les MCP Document Studio, préférer un chemin **relatif** à l’espace documentaire, par exemple `01_sources/00_inbox/fichier.docx` ou `07_livrables/01_brouillons/note.md`. Le chemin absolu `/data/shared-workspace/<chemin-relatif>` est aussi reconnu par le MCP OASIS et remappé strictement vers son volume documentaire; aucun autre chemin absolu n’est permis.
+3. Créer un manifeste avec `oasis_document_studio_create_document_brief` : objectif, destinataire, sections, sources et formats attendus, sauf lorsqu’un mandat ne demande qu’une analyse Markdown intermédiaire.
+4. Rédiger un brouillon Markdown cohérent dans `07_livrables/01_brouillons/` ou dans le dossier explicitement demandé. Utiliser des titres hiérarchisés, des tableaux pour les résultats, et des références de source vérifiables.
+5. Ne jamais inventer un montant, une date, une décision, une superficie ou un résultat. Utiliser `À valider` et consigner l’information manquante dans la mémoire commune avec `oasis_shared_memory_save_shared_record`.
+6. Appeler `oasis_document_studio_render_markdown_document` pour créer le DOCX et/ou le PDF avec la charte OASIS lorsque ces formats sont demandés. Le rendu est réalisé localement par Pandoc et LibreOffice; le document source n’est pas transmis à un moteur de rendu externe.
+7. Appeler `oasis_document_studio_check_document_quality`. Corriger tout avertissement avant de présenter le livrable comme prêt.
+8. Appeler `oasis_document_studio_render_document_preview` et examiner visuellement au minimum la page titre, les tableaux larges, les pages contenant figures ou images, et la dernière page.
+9. Enregistrer dans la mémoire partagée le chemin relatif du livrable, les sources, la version, le résultat du contrôle qualité et le statut d’approbation.
 
 ## Règles de qualité
 

@@ -19,6 +19,7 @@ channel_dispatch_source = (repository_root / 'src' / 'agent' / 'channel_dispatch
 tools_source = (repository_root / 'src' / 'tools.rs').read_text(encoding='utf-8')
 shared_memory_source = (ROOT / 'shared-memory' / 'server.js').read_text(encoding='utf-8')
 gis_source = (ROOT / 'gis-mcp' / 'server.js').read_text(encoding='utf-8')
+document_studio_source = (ROOT / 'document-studio' / 'server.js').read_text(encoding='utf-8')
 shared_memory_reindex_source = (ROOT / 'shared-memory' / 'reindex_embeddings.js').read_text(encoding='utf-8')
 shared_memory_dockerfile = (ROOT / 'shared-memory' / 'Dockerfile').read_text(encoding='utf-8')
 shared_memory_package = json.loads((ROOT / 'shared-memory' / 'package.json').read_text(encoding='utf-8'))
@@ -101,6 +102,9 @@ assert 'docker.sock' not in compose and './instance:/data' in compose, 'Le moteu
 assert 'OASIS_GIS_AGENT_WORKSPACE: /data/shared-workspace' in compose, 'Le service SIG doit connaître le chemin partagé vu par les profils.'
 assert "process.env.OASIS_GIS_AGENT_WORKSPACE ?? '/data/shared-workspace'" in gis_source, 'Le MCP SIG doit accepter seulement le chemin partagé explicitement configuré.'
 assert 'const inputRoot = [workspaceRoot, agentWorkspaceRoot].find' in gis_source and 'path.relative(inputRoot, absoluteInput)' in gis_source, 'Le MCP SIG doit remapper les chemins agents vers son volume sans élargir le périmètre.'
+assert 'OASIS_DOCUMENT_AGENT_WORKSPACE: /data/shared-workspace' in compose, 'Le service Document Studio doit connaître le chemin partagé vu par les profils.'
+assert "process.env.OASIS_DOCUMENT_AGENT_WORKSPACE ?? '/data/shared-workspace'" in document_studio_source, 'Le MCP documentaire doit accepter seulement le chemin partagé explicitement configuré.'
+assert 'const inputRoot = [workspaceRoot, agentWorkspaceRoot].find' in document_studio_source and 'path.relative(inputRoot, absoluteInput)' in document_studio_source, 'Le MCP documentaire doit remapper les chemins agents vers son volume sans élargir le périmètre.'
 for service in ('oasis-memory-db:', 'oasis-shared-memory:', 'oasis-gis:', 'oasis-document-studio:', 'oasis-optimizer:', 'oasis-skillopt:', 'oasis-reference-miner:', 'spacebot-oasis-v2:', 'oasis-failure-remediator:', 'oasis-approval-bridge:'):
     assert service in compose, f'Service Docker manquant : {service}'
 assert 'OASIS_OPTIMIZER_ENABLED: ${OASIS_OPTIMIZER_ENABLED:-true}' in compose, 'Le service DSPy doit être actif par défaut.'
@@ -217,6 +221,8 @@ for expected_tool in (
 assert '/data/shared-workspace/<chemin-relatif>' in skill_texts, 'Les compétences doivent distinguer le chemin absolu File du chemin relatif du studio documentaire.'
 pse_sig_skill = (ROOT / 'profile-skills' / 'oasis-pse-sig' / 'SKILL.md').read_text(encoding='utf-8')
 assert 'Lire le KML **sur place**' in pse_sig_skill and '`04_pse_sig/02_kml_geojson/KML_OASIS-V2_Val-dOr.kml`' in pse_sig_skill, 'Le profil PSE/SIG doit travailler sur le KML inventorié sans le déplacer.'
+document_studio_skill = (ROOT / 'profile-skills' / 'oasis-document-studio' / 'SKILL.md').read_text(encoding='utf-8')
+assert 'Si le mandat indique **lecture seule**' in document_studio_skill and 'Ne jamais appeler `oasis_document_studio_classify_workspace_document`' in document_studio_skill, 'Le profil documentaire doit respecter une analyse explicitement en lecture seule.'
 coordination_skill = (ROOT / 'profile-skills' / 'oasis-coordination' / 'SKILL.md').read_text(encoding='utf-8')
 assert 'sans déléguer' in coordination_skill and 'ne pas appeler l’outil de délégation' in coordination_skill, 'Le coordonnateur doit respecter une consigne explicite de non-délégation.'
 assert '/data/shared-workspace/01_sources/00_inbox' in coordination_skill, 'Le coordonnateur doit lire l’inbox depuis l’espace partagé, jamais son workspace privé.'
@@ -228,7 +234,9 @@ assert 'maybe_run_autonomy_with_trigger(deps, true).await;' in autonomy_source, 
 assert 'if !triggered\n        && !autonomy_run_due(' in autonomy_source, 'Seul un déclencheur explicite peut court-circuiter l’intervalle Cortex.'
 assert 'claim_ready_tasks_woken_by_approval' in autonomy_source and 'TASK_APPROVED_WAKE_ID' in autonomy_source, 'Un réveil de tâche approuvée doit revendiquer de manière atomique le mandat attribué.'
 assert 'status: Some(TaskStatus::InProgress)' in autonomy_source and 'fail_unclosed_claimed_tasks' in autonomy_source, 'Une tâche revendiquée doit être visible en cours puis clôturée explicitement si le cycle échoue.'
-assert 'Never leave a claimed task in progress merely because an MCP or tool call failed.' in (repository_root / 'prompts' / 'en' / 'autonomy_channel.md.j2').read_text(encoding='utf-8'), 'Le prompt d’autonomie doit exiger une clôture Done ou Failed du mandat revendiqué.'
+autonomy_prompt = (repository_root / 'prompts' / 'en' / 'autonomy_channel.md.j2').read_text(encoding='utf-8')
+assert 'Never leave a claimed task in progress merely because an MCP or tool call failed.' in autonomy_prompt, 'Le prompt d’autonomie doit exiger une clôture Done ou Failed du mandat revendiqué.'
+assert 'A task marked read-only, `lecture seule`, or equivalent forbids document classification' in autonomy_prompt, 'Le prompt d’autonomie doit interdire tout classement pour un mandat en lecture seule.'
 assert 'const MAX_BRANCH_WALL_CLOCK_TIMEOUT_SECS: u64 = 300;' in channel_dispatch_source, 'Les branches OASIS doivent avoir une limite de durée stricte.'
 assert 'tokio::time::timeout(' in channel_dispatch_source and 'Branch timed out after {branch_timeout_secs}s without a conclusion.' in channel_dispatch_source, 'Une branche bloquée doit émettre une terminaison et libérer sa capacité.'
 assert 'if branches.len() >= max_branches {' in channel_dispatch_source, 'La limite de branches doit être revérifiée atomiquement avant le lancement.'
