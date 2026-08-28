@@ -18,26 +18,28 @@ cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
 [defaults.routing]
-channel = "openrouter/deepseek/deepseek-v4-flash"
-branch = "openrouter/openai/gpt-oss-120b"
-worker = "openrouter/qwen/qwen3.7-flash"
+channel = "openrouter/deepseek/deepseek-chat"
+branch = "openrouter/openai/gpt-4o-mini"
+worker = "openrouter/qwen/qwen-2.5-72b-instruct"
 compactor = "openrouter/mistralai/mistral-nemo"
 cortex = "openrouter/mistralai/mistral-nemo"
 rate_limit_cooldown_secs = 90
 
 [defaults.routing.task_overrides]
-document_vision = "openrouter/google/gemini-2.5-flash-lite"
-deep_reasoning = "openrouter/openai/gpt-oss-120b"
-structured_extraction = "openrouter/qwen/qwen3.7-flash"
-data_processing = "openrouter/qwen/qwen3.7-flash"
+document_vision = "openrouter/google/gemini-2.5-flash"
+deep_reasoning = "openrouter/deepseek/deepseek-r1"
+structured_extraction = "openrouter/qwen/qwen-2.5-72b-instruct"
+data_processing = "openrouter/qwen/qwen-2.5-72b-instruct"
 coding = "openrouter/openai/gpt-oss-120b"
 
 [defaults.routing.fallbacks]
-"openrouter/deepseek/deepseek-v4-flash" = ["openrouter/openai/gpt-oss-120b", "openrouter/google/gemini-2.5-flash-lite"]
-"openrouter/openai/gpt-oss-120b" = ["openrouter/deepseek/deepseek-v4-flash", "openrouter/google/gemini-2.5-flash-lite"]
-"openrouter/qwen/qwen3.7-flash" = ["openrouter/deepseek/deepseek-v4-flash", "openrouter/openai/gpt-oss-120b"]
-"openrouter/mistralai/mistral-nemo" = ["openrouter/qwen/qwen3.7-flash"]
-"openrouter/google/gemini-2.5-flash-lite" = ["openrouter/deepseek/deepseek-v4-flash"]
+"openrouter/deepseek/deepseek-chat" = ["openrouter/openai/gpt-4o-mini", "openrouter/qwen/qwen-2.5-72b-instruct"]
+"openrouter/openai/gpt-4o-mini" = ["openrouter/deepseek/deepseek-chat", "openrouter/google/gemini-2.5-flash"]
+"openrouter/qwen/qwen-2.5-72b-instruct" = ["openrouter/deepseek/deepseek-chat", "openrouter/openai/gpt-4o-mini"]
+"openrouter/openai/gpt-oss-120b" = ["openrouter/deepseek/deepseek-chat", "openrouter/qwen/qwen-2.5-72b-instruct"]
+"openrouter/mistralai/mistral-nemo" = ["openrouter/openai/gpt-4o-mini"]
+"openrouter/google/gemini-2.5-flash" = ["openrouter/deepseek/deepseek-chat"]
+"openrouter/deepseek/deepseek-r1" = ["openrouter/deepseek/deepseek-chat"]
 
 # OpenCode est réservé aux tâches de développement multi-fichiers. Les agents builtin
 # restent utilisés pour l’analyse documentaire, SIG, commandes ponctuelles et écritures courtes.
