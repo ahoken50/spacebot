@@ -82,6 +82,16 @@ def score_output(output: str, expected: dict[str, Any]) -> Score:
     has_source = bool(re.search(r"(source|référence|annexe|pièce|\[\d+\])", normalized))
     max_chars = int(expected.get("max_chars", 5000))
     feedback: list[str] = []
+
+    # Évaluation de la précision des schémas d'outils (Chantier 15)
+    tool_calls_score = 1.0
+    expected_tools = expected.get("expected_tool_calls", [])
+    if expected_tools:
+        tool_hits = sum(1 for tool in expected_tools if normalize(str(tool)) in normalized)
+        tool_calls_score = tool_hits / len(expected_tools)
+        if tool_hits < len(expected_tools):
+            feedback.append(f"Outils attendus manquants : {len(expected_tools) - tool_hits}.")
+
     if required and required_hits != len(required):
         feedback.append(f"Termes requis absents : {len(required) - required_hits}.")
     if forbidden_hits:
@@ -94,7 +104,7 @@ def score_output(output: str, expected: dict[str, Any]) -> Score:
     forbidden_score = max(0.0, 1.0 - (forbidden_hits / max(1, len(forbidden))))
     source_score = 1.0 if not expected.get("require_source_markers", False) or has_source else 0.0
     brevity_score = 1.0 if len(output) <= max_chars else max(0.0, max_chars / max(1, len(output)))
-    total = round(0.45 * required_score + 0.25 * forbidden_score + 0.20 * source_score + 0.10 * brevity_score, 4)
+    total = round(0.40 * required_score + 0.20 * forbidden_score + 0.15 * source_score + 0.10 * brevity_score + 0.15 * tool_calls_score, 4)
     return Score(total, required_score, forbidden_score, source_score, brevity_score, feedback)
 
 

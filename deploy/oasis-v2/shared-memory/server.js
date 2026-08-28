@@ -54,8 +54,10 @@ async function initializeDatabase() {
     )
   `);
   await pool.query("ALTER TABLE shared_records ADD COLUMN IF NOT EXISTS embedding_profile TEXT NOT NULL DEFAULT ''");
+  await pool.query("ALTER TABLE shared_records ADD COLUMN IF NOT EXISTS valid_from TIMESTAMPTZ");
+  await pool.query("ALTER TABLE shared_records ADD COLUMN IF NOT EXISTS valid_until TIMESTAMPTZ");
   await pool.query('CREATE INDEX IF NOT EXISTS shared_records_scope_index ON shared_records (scope, record_type, status)');
-  await pool.query('CREATE INDEX IF NOT EXISTS shared_records_updated_index ON shared_records (updated_at DESC)');
+  await pool.query('CREATE INDEX IF NOT EXISTS shared_records_temporal_index ON shared_records (valid_from, valid_until)');
   await pool.query(`CREATE INDEX IF NOT EXISTS shared_records_embedding_index ON shared_records USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS shared_record_links (
@@ -166,13 +168,15 @@ function createServer() {
         source_references: z.array(z.string().min(1).max(500)).max(30).default([]),
         created_by: z.string().min(3).max(100),
         status: z.enum(['draft', 'active', 'pending_approval', 'approved', 'superseded', 'archived']).default('active'),
+        valid_from: z.string().datetime().optional(),
+        valid_until: z.string().datetime().optional(),
       },
     },
-    async ({ external_key, record_type, scope, title, content, payload, source_references, created_by, status }) => {
+    async ({ external_key, record_type, scope, title, content, payload, source_references, created_by, status, valid_from, valid_until }) => {
       // Une mise à jour identique d’une entité stable ne mérite ni nouvel embedding ni écriture d’audit.
       if (external_key) {
         const existing = await pool.query(
-          'SELECT id, external_key, record_type, scope, title, content, payload, source_references, created_by, status, embedding_profile, created_at, updated_at FROM shared_records WHERE external_key = $1 LIMIT 1',
+          'SELECT id, external_key, record_type, scope, title, content, payload, source_references, created_by, status, valid_from, valid_until, embedding_profile, created_at, updated_at FROM shared_records WHERE external_key = $1 LIMIT 1',
           [external_key],
         );
         const record = existing.rows[0];
@@ -183,6 +187,8 @@ function createServer() {
           && record.content === content
           && record.created_by === created_by
           && record.status === status
+          && record.valid_from === (valid_from ? new Date(valid_from).toISOString() : null)
+          && record.valid_until === (valid_until ? new Date(valid_until).toISOString() : null)
           && record.embedding_profile === embeddingProfile
           && JSON.stringify(record.payload) === JSON.stringify(payload)
           && JSON.stringify(record.source_references) === JSON.stringify(source_references)) {
@@ -224,8 +230,8 @@ function createServer() {
         `
           INSERT INTO shared_records (
             id, external_key, record_type, scope, title, content, payload,
-            source_references, created_by, status, embedding, embedding_profile
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11::vector, $12)
+            source_references, created_by, status, valid_from, valid_until, embedding, embedding_profile
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11::timestamptz, $12::timestamptz, $13::vector, $14)
           ON CONFLICT (external_key) DO UPDATE SET
             record_type = EXCLUDED.record_type,
             scope = EXCLUDED.scope,
@@ -235,12 +241,14 @@ function createServer() {
             source_references = EXCLUDED.source_references,
             created_by = EXCLUDED.created_by,
             status = EXCLUDED.status,
+            valid_from = EXCLUDED.valid_from,
+            valid_until = EXCLUDED.valid_until,
             embedding = EXCLUDED.embedding,
             embedding_profile = EXCLUDED.embedding_profile,
             updated_at = now()
-          RETURNING id, external_key, record_type, scope, title, status, created_at, updated_at
+          RETURNING id, external_key, record_type, scope, title, status, valid_from, valid_until, created_at, updated_at
         `,
-        [recordId, external_key ?? null, record_type, scope, title, content, JSON.stringify(payload), JSON.stringify(source_references), created_by, status, vectorLiteral(embedding), embeddingProfile],
+        [recordId, external_key ?? null, record_type, scope, title, content, JSON.stringify(payload), JSON.stringify(source_references), created_by, status, valid_from ?? null, valid_until ?? null, vectorLiteral(embedding), embeddingProfile],
       );
       const record = result.rows[0];
 
@@ -268,31 +276,33 @@ function createServer() {
   server.registerTool(
     'search_shared_memory',
     {
-      description: 'Rechercher dans la mémoire commune de tous les profils OASIS par similarité sémantique et filtres. Toujours citer les source_references dans les livrables produits à partir du résultat.',
+      description: 'Rechercher dans la mémoire commune de tous les profils OASIS par similarité sémantique, filtres et date de validité temporelle (as_of_date). Toujours citer les source_references dans les livrables produits à partir du résultat.',
       inputSchema: {
         query: z.string().min(3).max(1_000),
         scope: z.string().max(160).optional(),
         record_type: z.string().max(80).optional(),
         status: z.string().max(80).optional(),
+        as_of_date: z.string().datetime().optional(),
         limit: z.number().int().min(1).max(10).default(5),
       },
     },
-    async ({ query, scope, record_type, status, limit }) => {
+    async ({ query, scope, record_type, status, as_of_date, limit }) => {
       const embedding = await embedQuery(query);
       const result = await pool.query(
         `
           SELECT id, external_key, record_type, scope, title, content, payload,
-                 source_references, created_by, status, created_at, updated_at,
+                 source_references, created_by, status, valid_from, valid_until, created_at, updated_at,
                  1 - (embedding <=> $1::vector) AS similarity
           FROM shared_records
           WHERE ($2::text IS NULL OR scope = $2)
             AND ($3::text IS NULL OR record_type = $3)
             AND ($4::text IS NULL OR status = $4)
+            AND ($5::timestamptz IS NULL OR ((valid_from IS NULL OR valid_from <= $5) AND (valid_until IS NULL OR valid_until >= $5)))
             AND embedding_profile = $6
           ORDER BY embedding <=> $1::vector
-          LIMIT $5
+          LIMIT $7
         `,
-        [vectorLiteral(embedding), scope ?? null, record_type ?? null, status ?? null, limit, embeddingProfile],
+        [vectorLiteral(embedding), scope ?? null, record_type ?? null, status ?? null, as_of_date ?? null, embeddingProfile, limit],
       );
       const compactRecords = normalizeRecords(result.rows).map((record) => ({
         ...record,
