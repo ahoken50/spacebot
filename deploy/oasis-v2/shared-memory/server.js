@@ -286,27 +286,39 @@ function createServer() {
     },
   );
 
+  const relationTypes = z.enum([
+    'depends_on', 'justifies', 'measures', 'replaces', 'concerns',
+    'produced_by', 'approved_by', 'evidenced_by',
+    // Backward-compatible aliases emitted by older agent prompts.
+    'evidences', 'supports',
+  ]);
+  const canonicalRelation = {
+    evidences: 'evidenced_by',
+    supports: 'justifies',
+  };
+
   server.registerTool(
     'link_shared_records',
     {
-      description: 'Créer un lien traçable entre deux enregistrements partagés. Exemples : dépend_de, justifie, mesure, remplace, concerne, produit_par.',
+      description: 'Créer un lien traçable entre deux enregistrements partagés. Les valeurs canoniques sont depends_on, justifies, measures, replaces, concerns, produced_by, approved_by et evidenced_by; evidences et supports sont acceptées comme alias rétrocompatibles.',
       inputSchema: {
         from_record_id: z.string().uuid(),
         to_record_id: z.string().uuid(),
-        relation_type: z.enum(['depends_on', 'justifies', 'measures', 'replaces', 'concerns', 'produced_by', 'approved_by', 'evidenced_by']),
+        relation_type: relationTypes,
         created_by: z.string().min(3).max(100),
       },
     },
     async ({ from_record_id, to_record_id, relation_type, created_by }) => {
+      const normalizedRelation = canonicalRelation[relation_type] ?? relation_type;
       await pool.query(
         `
           INSERT INTO shared_record_links (from_record_id, to_record_id, relation_type, created_by)
           VALUES ($1, $2, $3, $4)
           ON CONFLICT (from_record_id, to_record_id, relation_type) DO NOTHING
         `,
-        [from_record_id, to_record_id, relation_type, created_by],
+        [from_record_id, to_record_id, normalizedRelation, created_by],
       );
-      return textResult({ linked: true, from_record_id, to_record_id, relation_type });
+      return textResult({ linked: true, from_record_id, to_record_id, relation_type: normalizedRelation });
     },
   );
 
