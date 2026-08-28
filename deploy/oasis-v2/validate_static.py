@@ -219,6 +219,10 @@ for expected_tool in (
 ):
     assert expected_tool in skill_texts, f'Outil MCP préfixé absent des compétences : {expected_tool}'
 assert '/data/shared-workspace/<chemin-relatif>' in skill_texts, 'Les compétences doivent distinguer le chemin absolu File du chemin relatif du studio documentaire.'
+foundation_skill = (ROOT / 'skills' / 'oasis-foundation' / 'SKILL.md').read_text(encoding='utf-8')
+for relation in ('depends_on', 'justifies', 'measures', 'replaces', 'concerns', 'produced_by', 'approved_by', 'evidenced_by'):
+    assert f'`{relation}`' in foundation_skill, f'Relation mémoire MCP absente des fondations : {relation}'
+assert '`evidences`' in foundation_skill and 'ne jamais utiliser' in foundation_skill, 'La compétence fondation doit interdire les variantes de relation invalides.'
 pse_sig_skill = (ROOT / 'profile-skills' / 'oasis-pse-sig' / 'SKILL.md').read_text(encoding='utf-8')
 assert 'Lire le KML **sur place**' in pse_sig_skill and '`04_pse_sig/02_kml_geojson/KML_OASIS-V2_Val-dOr.kml`' in pse_sig_skill, 'Le profil PSE/SIG doit travailler sur le KML inventorié sans le déplacer.'
 document_studio_skill = (ROOT / 'profile-skills' / 'oasis-document-studio' / 'SKILL.md').read_text(encoding='utf-8')
