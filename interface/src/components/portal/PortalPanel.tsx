@@ -11,7 +11,6 @@ import { PortalHeader } from "./PortalHeader";
 import { PortalTimeline } from "./PortalTimeline";
 import { PortalComposer } from "./PortalComposer";
 import { PortalEmpty } from "./PortalEmpty";
-import { PortalAutonomousActivity } from "./PortalAutonomousActivity";
 
 interface PortalPanelProps {
   agentId: string;
@@ -269,8 +268,6 @@ export function PortalPanel({ agentId }: PortalPanelProps) {
           showHistory={showHistory}
           onToggleHistory={setShowHistory}
         />
-
-        <PortalAutonomousActivity />
 
         {isEmpty ? (
           <div className="flex flex-1 items-center justify-center py-10">

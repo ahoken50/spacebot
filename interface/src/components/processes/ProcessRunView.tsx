@@ -253,11 +253,56 @@ export function ProcessDetail({agentId, selection, fallback, liveTranscript, onC
 			<section className="px-5 py-4">
 				<div className="flex flex-col gap-3">
 					<div>
-						<p className="mb-1 text-tiny font-medium text-ink-faint">Input</p>
+						<p className="mb-1 text-tiny font-medium text-ink-faint">Input / Mandat</p>
 						<div className="text-xs leading-5 text-ink"><Markdown>{detail.input}</Markdown></div>
 					</div>
+
+					{/* Thinking Tree / Reasoning Flow Visualizer (24) */}
+					{transcript && transcript.length > 0 && (
+						<div className="rounded-lg border border-accent/20 bg-app-box/60 p-3 my-1">
+							<div className="text-[11px] font-semibold uppercase tracking-wider text-accent mb-2.5 flex items-center gap-1.5">
+								<GitBranch className="size-3.5" />
+								Arbre de Raisonnement & Parcours d'Outils
+							</div>
+							<div className="relative pl-4 space-y-3 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-accent/30">
+								<div className="relative flex items-start gap-2 text-tiny">
+									<div className="absolute -left-4 top-1 size-2 rounded-full bg-accent ring-2 ring-app-box" />
+									<span className="font-semibold text-ink">Mandat initial reçu</span>
+								</div>
+
+								{pairTranscriptSteps(transcript).map((item, index) => (
+									<div key={index} className="relative flex flex-col gap-1 text-tiny">
+										<div className="absolute -left-4 top-1 size-2 rounded-full bg-violet-400 ring-2 ring-app-box" />
+										{item.kind === "tool" ? (
+											<div className="flex items-center gap-2">
+												<span className="font-mono text-[11px] text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/20">
+													{item.pair.call.name}
+												</span>
+												<span className="text-ink-faint text-[10px]">
+													(étape {index + 1})
+												</span>
+											</div>
+										) : (
+											<p className="text-ink-dull italic line-clamp-2 text-[11px]">
+												« {item.text.slice(0, 140)}... »
+											</p>
+										)}
+									</div>
+								))}
+
+								{detail.output && (
+									<div className="relative flex items-start gap-2 text-tiny">
+										<div className="absolute -left-4 top-1 size-2 rounded-full bg-emerald-400 ring-2 ring-app-box" />
+										<span className="font-semibold text-emerald-400">Conclusion & Résultat final produit</span>
+									</div>
+								)}
+							</div>
+						</div>
+					)}
+
 					{transcript?.length ? (
 						<>
+						<p className="mt-2 text-tiny font-medium uppercase tracking-wider text-ink-faint">Transcription détaillée</p>
 						{pairTranscriptSteps(transcript).map((item, index) => (
 							<motion.div key={item.kind === "tool" ? item.pair.id : `text-${index}`} initial={{opacity: 0, y: 4}} animate={{opacity: 1, y: 0}}>
 								{item.kind === "tool" ? <ToolCall pair={item.pair} /> : <div className="text-xs text-ink-dull"><Markdown>{item.text.replace(/ {3,}/g, "  ")}</Markdown></div>}
