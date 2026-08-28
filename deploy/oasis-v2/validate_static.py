@@ -263,6 +263,11 @@ assert 'A fresh interactive worker remains available for follow-up' in worker_so
 initial_relay = worker_source.index('A fresh interactive worker remains available for follow-up')
 wait_for_input = worker_source.index('self.hook.send_status("waiting for input")', initial_relay)
 assert 'ProcessEvent::WorkerInitialResult' in worker_source[initial_relay:wait_for_input], 'Le worker interactif doit émettre son premier résultat avant de passer en attente.'
+portal_panel_source = (repository_root / 'interface' / 'src' / 'components' / 'portal' / 'PortalPanel.tsx').read_text(encoding='utf-8')
+portal_activity_source = (repository_root / 'interface' / 'src' / 'components' / 'portal' / 'PortalAutonomousActivity.tsx').read_text(encoding='utf-8')
+assert 'PortalAutonomousActivity' in portal_panel_source, 'Le Portal doit afficher l’activité autonome distinctement des workers internes.'
+assert 'api.autonomyRuns(undefined, 24)' in portal_activity_source and 'refetchInterval: 5_000' in portal_activity_source, 'La carte d’activité autonome doit interroger le flux global avec rafraîchissement.'
+assert 'status === "running"' in portal_activity_source, 'La carte doit distinguer explicitement un run autonome en cours.'
 assert 'available directly in this conversation and to builtin workers' in (repository_root / 'prompts' / 'en' / 'fragments' / 'worker_capabilities.md.j2').read_text(encoding='utf-8'), 'Le prompt doit confirmer l’accès MCP direct dans Portal.'
 assert 'should_route_to_messaging_adapter' in main_source and 'target.adapter_key() != "portal"' in main_source, 'Le Portal doit utiliser SSE sans double livraison par adaptateur.'
 bootstrap = (ROOT / 'bootstrap_instance.sh').read_text(encoding='utf-8')
