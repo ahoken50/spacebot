@@ -286,8 +286,29 @@ assert len(taxonomy['categories']) == 8, 'La taxonomie doit contenir huit catég
 assert '01_sources/00_inbox' in taxonomy['categories']['source']['folders']
 assert '07_livrables/03_approuves' in taxonomy['categories']['deliverable']['folders']
 
+# Vérification des fonctionnalités avancées OASIS-V2 (Chantiers 1 à 25)
+assert 'valid_from' in shared_memory_source and 'valid_until' in shared_memory_source, 'La mémoire commune doit être bi-temporelle.'
+assert 'as_of_date' in shared_memory_source, 'La recherche en mémoire doit accepter le filtre as_of_date.'
+assert 'archive_stale_records' in shared_memory_source, 'L’outil d’archivage TTL doit être présent dans le MCP mémoire.'
+assert 'cosine_distance' in shared_memory_source or 'similarity' in shared_memory_source, 'La détection de contradiction sémantique doit être active.'
+
+python_daemon = (ROOT / 'gis-mcp' / 'python_worker_daemon.py')
+assert python_daemon.is_file(), 'Le démon Python préchargé pour le SIG doit être présent.'
+
+process_view = (repository_root / 'interface' / 'src' / 'components' / 'processes' / 'ProcessRunView.tsx').read_text(encoding='utf-8')
+assert 'Thinking Tree' in process_view or 'TreeStructure' in process_view, 'Le visualiseur d’arbre de réflexion doit être présent dans l’interface.'
+
+autonomy_dial = (repository_root / 'interface' / 'src' / 'components' / 'autonomy' / 'AutonomyDialCard.tsx').read_text(encoding='utf-8')
+assert 'onForceWake' in autonomy_dial and 'Lancer un cycle' in autonomy_dial, 'Le bouton de réveil forcé immédiat doit être présent dans AutonomyDialCard.'
+
+approval_queue = (repository_root / 'interface' / 'src' / 'components' / 'autonomy' / 'ApprovalQueueCard.tsx').read_text(encoding='utf-8')
+assert 'executeMutation' in approval_queue and '⚡ Exécuter' in approval_queue, 'L’action Exécuter maintenant doit être présente dans ApprovalQueueCard.'
+
+assert 'fire_wake(wake_tx, &delegator)' in autonomy_source, 'Le signal de réveil direct au délégateur doit être présent dans autonomy.rs.'
+
 for required in [
     ROOT / 'gis-mcp' / 'server.js',
+    ROOT / 'gis-mcp' / 'python_worker_daemon.py',
     ROOT / 'document-studio' / 'server.js',
     ROOT / 'document-studio' / 'taxonomy.json',
     ROOT / 'document-studio' / 'templates' / 'oasis-reference.docx',
@@ -331,4 +352,4 @@ for required in [
     assert required.is_file(), f'Ressource requise absente : {required}'
 
 print('Validation statique OASIS-V2 : OK')
-print('Agents: 6 | Workspaces privés + données partagées sandboxées | Secrets par moindre privilège | MCP ciblés | OpenCode/Python: activés | Routage: OpenRouter sans Claude | Autonomie: apprentissage et acquisition de compétences jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée')
+print('Agents: 6 | Workspaces privés + données partagées sandboxées | Secrets par moindre privilège | MCP ciblés | OpenCode/Python: activés | Routage: OpenRouter sans Claude | Autonomie: apprentissage et acquisition de compétences jusqu’à approbation UI | Taxonomie: 8 catégories | DSPy/SkillOpt: évaluations autonomes | Promotion: tâche Spacebot approuvée seulement | Sobriété: activée | Bi-temporalité & Visualiseur: OK')
