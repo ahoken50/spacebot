@@ -476,6 +476,7 @@ pub async fn run_autonomy_channel(
         if recorded {
             handle.mark_completed();
             publish_terminal_summary(deps, &run_id, &request.summary);
+            notify_completed_delegated_tasks(deps, &claimed_task_numbers, &request.summary).await;
         }
     } else if !handle.completed() {
         if let Some(failure) = &channel_failed {
@@ -591,6 +592,22 @@ async fn claim_ready_tasks_woken_by_approval(
             Ok(ready_tasks) => task_numbers.extend(ready_tasks.into_iter().map(|task| task.task_number)),
             Err(error) => tracing::warn!(%error, run_id, agent_id = %deps.agent_id, "failed to list assigned Ready tasks for autonomy"),
         }
+
+        // Auto-revendication des tâches orphelines (Chantier 4)
+        if config.claim_unowned && task_numbers.is_empty() {
+            if let Ok(unowned_tasks) = deps
+                .task_store
+                .list(TaskListFilter {
+                    status: Some(TaskStatus::Ready),
+                    limit: Some(config.max_tasks_per_run as i64),
+                    ..Default::default()
+                })
+                .await
+            {
+                let unowned = unowned_tasks.into_iter().filter(|t| t.assigned_agent_id.is_none());
+                task_numbers.extend(unowned.map(|task| task.task_number));
+            }
+        }
     }
 
     let mut claimed = Vec::new();
@@ -603,9 +620,9 @@ async fn claim_ready_tasks_woken_by_approval(
                 continue;
             }
         };
-        if task.status != TaskStatus::Ready
-            || task.assigned_agent_id.as_deref() != Some(deps.agent_id.as_ref())
-        {
+        let is_assigned_to_me = task.assigned_agent_id.as_deref() == Some(deps.agent_id.as_ref());
+        let can_claim_unowned = config.claim_unowned && task.assigned_agent_id.is_none();
+        if task.status != TaskStatus::Ready || (!is_assigned_to_me && !can_claim_unowned) {
             continue;
         }
 
@@ -710,6 +727,106 @@ fn publish_terminal_summary(deps: &AgentDeps, run_id: &str, summary: &str) {
         })
     {
         tracing::debug!(%error, "failed to emit autonomy outcome for live timeline");
+    }
+}
+
+async fn notify_completed_delegated_tasks(
+    deps: &AgentDeps,
+    task_numbers: &[i64],
+    summary: &str,
+) {
+    let logger = crate::conversation::ConversationLogger::new(deps.sqlite_pool.clone());
+    for task_number in task_numbers {
+        let task = match deps.task_store.get_by_number(*task_number).await {
+            Ok(Some(task)) => task,
+            _ => continue,
+        };
+
+        if task.status != TaskStatus::Done {
+            continue;
+        }
+
+        let delegating_agent_id = task
+            .metadata
+            .get("delegating_agent_id")
+            .or_else(|| task.metadata.get("delegated_by"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let originating_channel = task
+            .metadata
+            .get("originating_channel")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let is_clarification = task
+            .metadata
+            .get("clarification_needed")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+            || task.title.to_lowercase().starts_with("clarification:");
+
+        let deliverable_text = if is_clarification {
+            format!(
+                "❓ [Demande de clarification inter-agents #{task_number}] : L'agent **{}** requiert une précision sur \"{}\" :\n\n{}",
+                deps.agent_id, task.title, summary
+            )
+        } else {
+            format!(
+                "📦 [Livrable tâche #{task_number}] : L'agent **{}** a terminé le mandat \"{}\".\n\n**Résultat / Synthèse :**\n{}",
+                deps.agent_id, task.title, summary
+            )
+        };
+
+        // Synchronisation automatique en mémoire de travail (Chantier 14)
+        deps.working_memory
+            .emit(
+                crate::memory::WorkingMemoryEventType::Outcome,
+                format!("Deliverable completed for task #{task_number}: {summary}"),
+            )
+            .importance(0.8)
+            .record();
+
+        if let Some(channel_id_str) = originating_channel {
+            let channel_id: crate::ChannelId = Arc::from(channel_id_str.as_str());
+            logger.log_system_message(&channel_id, &deliverable_text);
+            let _ = deps.event_tx.send(crate::ProcessEvent::ChannelAssistantMessage {
+                agent_id: deps.agent_id.clone(),
+                channel_id: channel_id.clone(),
+                text: deliverable_text.clone(),
+            });
+
+            // Also inject message into originating channel if owner agent is known
+            let target_agent = delegating_agent_id.as_deref().unwrap_or(task.owner_agent_id.as_str());
+            let injection = crate::ChannelInjection {
+                conversation_id: channel_id_str,
+                agent_id: target_agent.to_string(),
+                message: InboundMessage {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    source: "system".into(),
+                    adapter: None,
+                    conversation_id: channel_id.to_string(),
+                    sender: crate::Participant {
+                        id: format!("agent:{}", deps.agent_id),
+                        display_name: deps.agent_names.get(deps.agent_id.as_ref()).cloned().unwrap_or_else(|| deps.agent_id.to_string()),
+                        avatar_url: None,
+                    },
+                    content: crate::MessageContent::Text(deliverable_text.clone()),
+                    metadata: std::collections::HashMap::new(),
+                    reply_to_id: None,
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                },
+            };
+            let _ = deps.injection_tx.send(injection).await;
+        }
+
+        if let Some(delegator) = delegating_agent_id {
+            let links = deps.links.load();
+            if let Some(link) = crate::links::find_link_between(&links, &deps.agent_id, &delegator) {
+                let link_channel_id = link.channel_id_for(&delegator);
+                logger.log_system_message(&link_channel_id, &deliverable_text);
+            }
+        }
     }
 }
 

@@ -1485,6 +1485,23 @@ where
             {
                 tracing::warn!(%error, %worker_id, "failed to record the task attempt outcome");
             }
+
+            // Outcome-to-Task Sync (Chantier 18): When worker succeeds, transition task to Done
+            if resolved == WorkerOutcomeKind::Succeeded {
+                let worker_id_str = worker_id.to_string();
+                if let Ok(Some(assigned_task_number)) = task_store.task_number_for_worker(&worker_id_str).await {
+                    let update_input = crate::tasks::UpdateTaskInput {
+                        status: Some(crate::tasks::TaskStatus::Done),
+                        context: crate::tasks::TaskMutationContext::new(
+                            crate::tasks::TaskAuthorKind::Agent,
+                            Some(agent_id.to_string()),
+                            crate::tasks::TaskMutationSource::Tool,
+                        ).with_summary(Some(format!("Worker completed successfully: {summary_source}"))),
+                        ..Default::default()
+                    };
+                    let _ = task_store.update(assigned_task_number, update_input).await;
+                }
+            }
         }
 
         let (terminal, newly_committed) = match commit {
