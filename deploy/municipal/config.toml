@@ -1,5 +1,5 @@
 # Cellule municipale Spacebot — instance locale, OpenRouter uniquement.
-# Emplacement : monter ce fichier sur /data/config.toml (voir docker-compose.yml).
+# Monter ce fichier sur /data/config.toml (voir docker-compose.yml).
 # Prérequis : OPENROUTER_API_KEY dans .env. Aucun Claude. Aucun MCP.
 
 [llm]
@@ -8,26 +8,28 @@ openrouter_key = "env:OPENROUTER_API_KEY"
 [defaults]
 max_concurrent_branches = 1
 max_concurrent_workers = 1
-max_turns = 4
-branch_max_turns = 8
+max_turns = 8
+branch_max_turns = 10
 context_window = 96000
 history_backfill_count = 12
 worker_log_mode = "errors_only"
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
+# Canal / compacteur : DeepSeek Flash. Branche : GLM Flash.
+# Worker défaut : Flash. oss-120b seulement sur mun-outils.
 [defaults.routing]
 channel = "openrouter/deepseek/deepseek-v4-flash"
 branch = "openrouter/z-ai/glm-5.3-flash"
-worker = "openrouter/openai/gpt-oss-120b"
-compactor = "openrouter/openai/gpt-oss-20b"
+worker = "openrouter/deepseek/deepseek-v4-flash"
+compactor = "openrouter/deepseek/deepseek-v4-flash"
 cortex = "openrouter/openai/gpt-oss-20b"
 rate_limit_cooldown_secs = 90
 
 [defaults.routing.task_overrides]
 document_vision = "openrouter/google/gemini-2.5-flash-lite"
 deep_reasoning = "openrouter/z-ai/glm-5.3-flash"
-structured_extraction = "openrouter/openai/gpt-oss-120b"
+structured_extraction = "openrouter/deepseek/deepseek-v4-flash"
 data_processing = "openrouter/openai/gpt-oss-120b"
 coding = "openrouter/openai/gpt-oss-120b"
 
@@ -64,9 +66,9 @@ webfetch = "deny"
 
 [defaults.compaction]
 mode = "chronicle"
-background_threshold = 0.72
-aggressive_threshold = 0.82
-emergency_threshold = 0.93
+background_threshold = 0.78
+aggressive_threshold = 0.86
+emergency_threshold = 0.94
 
 [defaults.compaction.chronicle]
 interval_messages = 24
@@ -74,7 +76,7 @@ interval_token_fraction = 0.08
 recent_window_hours = 24
 max_recent = 4
 max_older = 6
-context_token_budget = 1200
+context_token_budget = 1800
 expand_message_limit = 25
 max_messages_per_checkpoint = 120
 rollup_threshold = 8
@@ -126,8 +128,9 @@ bio = "Approuve tout envoi externe, tout projet de règlement, tout engagement f
 [[agents]]
 id = "mun-coordination"
 display_name = "Coordination municipale"
-role = "Point d’entrée. Clarifie la demande, délègue, consolide, exige l’approbation humaine avant tout envoi."
+role = "Point d’entrée. Clarifie, délègue, consolide, exige l’approbation humaine avant tout envoi."
 default = true
+max_turns = 8
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
@@ -137,17 +140,24 @@ writable_paths = ["/data/shared"]
 [[agents]]
 id = "mun-redaction"
 display_name = "Rédaction institutionnelle"
-role = "Règlements, notes de service, lettres, communiqués. Brouillons seulement, tampon projet."
+role = "Règlements, notes de service, lettres, communiqués. Brouillons seulement."
+max_turns = 4
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
 [agents.sandbox]
 writable_paths = ["/data/shared"]
 
+[agents.routing]
+channel = "openrouter/deepseek/deepseek-v4-flash"
+branch = "openrouter/z-ai/glm-5.3-flash"
+worker = "openrouter/deepseek/deepseek-v4-flash"
+
 [[agents]]
 id = "mun-pilotage"
 display_name = "Projets et subventions"
-role = "Fiches projet, échéanciers, budgets de programme, suivis de subvention, écarts sourcés."
+role = "Fiches projet, échéanciers, budgets de programme, suivis de subvention."
+max_turns = 4
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
@@ -157,7 +167,8 @@ writable_paths = ["/data/shared"]
 [[agents]]
 id = "mun-juridique"
 display_name = "Validation juridique"
-role = "Veille et contrôle : LégisQuébec, CanLII, règlements municipaux, formalités. Avis de travail, pas un avis juridique opposable."
+role = "Contrôle LégisQuébec, CanLII, règlements. Avis de travail, pas un avis opposable."
+max_turns = 10
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
@@ -179,7 +190,8 @@ worker = "openrouter/z-ai/glm-5.3-flash"
 [[agents]]
 id = "mun-outils"
 display_name = "Outils et données"
-role = "Scripts Python, ETL, diffs, extracteurs, petits outils locaux. N’écrit aucun texte officiel."
+role = "Scripts Python, ETL, diffs. N’écrit aucun texte officiel."
+max_turns = 10
 cron_timezone = "America/Toronto"
 user_timezone = "America/Toronto"
 
