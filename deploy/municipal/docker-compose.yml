@@ -1,0 +1,18 @@
+services:
+  spacebot:
+    image: ghcr.io/spacedriveapp/spacebot:latest
+    container_name: spacebot-municipal
+    restart: unless-stopped
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      SPACEBOT_DIR: /data
+    ports:
+      - "127.0.0.1:19898:19898"
+    volumes:
+      - spacebot-data:/data
+      - ./config.toml:/data/config.toml:ro
+      - ${MUN_TRAVAIL:-${HOME}/mun-travail}:/data/shared
+    mem_limit: 4g
+
+volumes:
+  spacebot-data:
