@@ -11,8 +11,10 @@ services:
     volumes:
       - spacebot-data:/data
       - ./config.toml:/data/config.toml:ro
+      - ./identity:/data/municipal-identity:ro
+      - ./profile-skills:/data/municipal-skills:ro
       - ${MUN_TRAVAIL:-${HOME}/mun-travail}:/data/shared
-    mem_limit: 4g
+    mem_limit: 8g
 
 volumes:
   spacebot-data:

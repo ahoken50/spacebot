@@ -1,44 +1,33 @@
 # Cellule municipale Spacebot
 
-Pack mince : **un seul service Spacebot**, cinq agents, OpenRouter, aucun MCP.
-
-## Agents
-
-| ID | Rôle |
-| --- | --- |
-| `mun-coordination` | Point d’entrée, délégation, stop avant envoi |
-| `mun-redaction` | Règlements, notes, lettres, communiqués (brouillon) |
-| `mun-pilotage` | Projets et subventions |
-| `mun-juridique` | Validation légale de travail (LégisQuébec, CanLII) |
-| `mun-outils` | Scripts, ETL, OpenCode |
+Un service Spacebot, cinq agents, OpenRouter, aucun MCP.
 
 ## Démarrage
 
 ```bash
-cp deploy/municipal/.env.example deploy/municipal/.env
-# renseigner OPENROUTER_API_KEY
-mkdir -p ~/mun-travail
-
-docker compose -f deploy/municipal/docker-compose.yml up -d
+cp .env.example .env
+./bootstrap_instance.sh
+docker compose up -d
+# une fois les agents créés :
+docker compose exec spacebot /bin/sh -c 'for id in mun-coordination mun-redaction mun-pilotage mun-juridique mun-outils; do
+  mkdir -p /data/agents/$id/workspace/skills
+  cp /data/municipal-identity/$id/* /data/agents/$id/
+  cp -R /data/municipal-skills/mun-fondation /data/agents/$id/workspace/skills/
+  cp -R /data/municipal-skills/$id /data/agents/$id/workspace/skills/
+done'
 ```
 
 UI : http://127.0.0.1:19898
 
-Le dossier `~/mun-travail` est monté dans `/data/shared`.
-Les compétences sont dans `deploy/municipal/profile-skills/`.
-Après le premier boot, les copier dans le workspace de chaque agent.
-
-## Routage OpenRouter (défauts)
+## Routage
 
 | Processus | Modèle |
 | --- | --- |
-| channel | `openrouter/deepseek/deepseek-v4-flash` |
-| branch | `openrouter/z-ai/glm-5.3-flash` |
-| worker | `openrouter/openai/gpt-oss-120b` |
-| compactor / cortex | `openrouter/openai/gpt-oss-20b` |
-| vision | `openrouter/google/gemini-2.5-flash-lite` |
-| mun-juridique | GLM 5.3 Flash |
-| mun-outils | gpt-oss-120b |
+| channel, worker, **compactor** | `deepseek/deepseek-v4-flash` |
+| branch / juridique | `z-ai/glm-5.3-flash` |
+| outils seulement | `openai/gpt-oss-120b` |
+| cortex | `openai/gpt-oss-20b` |
 
-Vérifier les slugs sur openrouter.ai/models avant le premier boot.
-OASIS-V2 reste sur `feat/oasis-v2-pilotage`.
+Tours : coordination 8 · rédaction/pilotage 4 · juridique/outils 10.
+
+Délégation : `identity/mun-coordination/ROLE.md`.
